@@ -1,6 +1,6 @@
 # Dockerfile
-# Use an official Python runtime based on Debian (e.g., slim-buster or slim-bullseye)
-FROM python:3.11-slim-bullseye # Bullseye is a newer Debian version than Buster
+# Use an official Python runtime based on Debian Bookworm
+FROM python:3.13-slim-bookworm
 
 # Set environment variables to prevent Python from writing .pyc files to disc and to buffer output
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -10,19 +10,18 @@ ENV PYTHONUNBUFFERED 1
 WORKDIR /app
 
 # Install system dependencies using apt-get
-# - postgresql-client: for Django to connect to PostgreSQL (e.g., for `psql` or `pg_isready`)
-# - build-essential, libpq-dev: might be needed if psycopg2-binary isn't used or has issues,
-#   or for other packages that need C extensions.
-# - libjpeg-dev, zlib1g-dev: examples if you were using Pillow for image processing
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       bash \ # Good to have for shell access and some scripts
+       bash \
        postgresql-client \
+       build-essential \
+       libpq-dev \
+       libjpeg-dev \
+       zlib1g-dev \
+       gettext \
        # Add other system dependencies as needed, for example:
-       # build-essential \
-       # libpq-dev \
-       # libjpeg-dev \
-       # zlib1g-dev \
+       # libxml2-dev libxslt1-dev (for lxml or similar)
+       # git (if you need to pull from git during build)
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -59,5 +58,4 @@ EXPOSE 8000
 # For production, you'd use Gunicorn here.
 # CMD ["gunicorn", "--bind", "0.0.0.0:8000", "infiniti.wsgi:application"]
 # For now, let's make it run the dev server if no command is specified in docker-compose.
-# Replace 'your_project_name' with your actual Django project name.
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
