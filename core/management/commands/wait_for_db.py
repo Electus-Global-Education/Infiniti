@@ -1,22 +1,4 @@
-# your_django_app/management/commands/wait_for_db.py
-# Create this file structure:
-# your_project_root/
-#  ├── your_django_app_name/  <-- This is one of your Django apps
-#  │   ├── __init__.py
-#  │   ├── management/
-#  │   │   ├── __init__.py
-#  │   │   └── commands/
-#  │   │       ├── __init__.py
-#  │   │       └── wait_for_db.py
-#  │   ├── apps.py
-#  │   ├── models.py
-#  │   └── ...
-#  ├── your_project_name/     <-- This is your Django project directory (contains settings.py)
-#  │   ├── __init__.py
-#  │   ├── settings.py
-#  │   ├── urls.py
-#  │   └── wsgi.py
-#  └── manage.py
+# infiniti/core/management/commands/wait_for_db.py
 
 import time
 import os
