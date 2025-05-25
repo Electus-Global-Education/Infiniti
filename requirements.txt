@@ -1,0 +1,24 @@
+# requirements.txt
+django>=4.2 # Or your preferred Django version
+gunicorn # For production, but good to have listed. We use runserver for dev in compose.
+psycopg2-binary # PostgreSQL adapter for Python
+python-dotenv # To load .env files if running manage.py outside Docker for some reason
+django-environ # Excellent for managing settings from environment variables
+
+# Django REST Framework and related packages
+djangorestframework>=3.14 # Or your preferred DRF version
+django-cors-headers # For handling Cross-Origin Resource Sharing (CORS)
+drf-spectacular # For generating OpenAPI 3 schema and Swagger/ReDoc documentation
+
+# Image handling
+Pillow # For image processing, often needed with ImageField in models
+
+# Static files serving in production
+whitenoise # Simplified static file serving for production
+
+# HTTP client (if your app needs to make external API calls)
+# requests
+
+# Add any other Python packages your project needs, for example:
+# celery # For asynchronous tasks
+# redis # Often used with Celery as a message broker
