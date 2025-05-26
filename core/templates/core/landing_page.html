@@ -1,0 +1,79 @@
+{% extends "base.html" %} {% load static %}
+
+{% block title_tag_content %}Home - Infiniti Project{% endblock title_tag_content %}
+
+{% block page_specific_css %}
+    <style>
+        .hero-section {
+            background-color: #f0f8ff; /* AliceBlue for a light, welcoming feel */
+            padding: 40px 20px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+        .hero-section h1 {
+            color: #2c3e50; /* Dark blue, similar to footer */
+            margin-bottom: 15px;
+        }
+        .features-grid {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        .feature-item {
+            background-color: #ffffff;
+            border: 1px solid #e7e7e7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px;
+            width: calc(33.333% - 40px); /* Adjust for spacing */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .feature-item h3 {
+            color: #337ab7; /* Bootstrap primary blue */
+            margin-top: 0;
+        }
+        @media (max-width: 768px) {
+            .feature-item {
+                width: calc(50% - 30px);
+            }
+        }
+        @media (max-width: 576px) {
+            .feature-item {
+                width: calc(100% - 20px);
+            }
+        }
+    </style>
+{% endblock page_specific_css %}
+
+{% block main_page_content %}
+    <div class="hero-section">
+        <h1>{{ page_heading|default:"Welcome to Our Platform!" }}</h1>
+        <p class="lead">{{ featured_message|default:"Explore what we have to offer." }}</p>
+        <a href="#" class="btn btn-primary btn-lg">Get Started</a>
+    </div>
+
+    <div class="features-grid">
+        <div class="feature-item">
+            <h3>Feature One</h3>
+            <p>Description of the first amazing feature of your platform.</p>
+        </div>
+        <div class="feature-item">
+            <h3>Feature Two</h3>
+            <p>Details about another compelling aspect or service offered.</p>
+        </div>
+        <div class="feature-item">
+            <h3>Feature Three</h3>
+            <p>Information on a third key benefit or tool available.</p>
+        </div>
+    </div>
+
+    <section style="margin-top: 40px; padding: 20px; background-color: #e9ecef; border-radius: 8px;">
+        <h2>More About Us</h2>
+        <p>This section can contain more detailed information about your project, mission, or values. Use this space to engage your visitors further.</p>
+    </section>
+{% endblock main_page_content %}
+
+{% block page_specific_js %}
+    {% endblock page_specific_js %}
