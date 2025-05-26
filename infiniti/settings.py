@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import environ # Import django-environ
+from datetime import timedelta      
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent # This should point to your project root (Infiniti/)
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles', # Required for static files management
+    'edujobs',
 
     # Third-party apps
     'rest_framework',
@@ -169,7 +171,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication', # For browsable API and session-based auth
         # 'rest_framework.authentication.TokenAuthentication', # Example: For token-based auth
-        # 'rest_framework_simplejwt.authentication.JWTAuthentication', # Example: For JWT
+        'rest_framework_simplejwt.authentication.JWTAuthentication', # Example: For JWT
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly', # Or IsAuthenticated, AllowAny, etc.
@@ -185,7 +187,14 @@ REST_FRAMEWORK = {
     #     'rest_framework.parsers.JSONParser',
     # ),
 }
-
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),   # default is 5 mins
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "ALGORITHM": "HS256",
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
 # --- drf-spectacular Settings (API Documentation) ---
 # https://drf-spectacular.readthedocs.io/en/latest/settings.html
 SPECTACULAR_SETTINGS = {
@@ -210,6 +219,9 @@ CORS_ALLOW_CREDENTIALS = True # If your frontend needs to send cookies/auth head
 # --- CSRF Settings ---
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # Already defined with env
 # Ensure your frontend's domain (including scheme and port if not standard) is listed here if it makes POST/PUT/DELETE requests.
+# Load Gemini settings
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(BASE_DIR, ".env_gemini"))
 
 # --- Logging Configuration (Example) ---
 # https://docs.djangoproject.com/en/stable/topics/logging/
