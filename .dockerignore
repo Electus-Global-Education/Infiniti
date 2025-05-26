@@ -1,0 +1,74 @@
+# .dockerignore
+
+# Git
+.git/
+.gitignore
+
+# Docker - Exclude files related to Docker itself if they are in the context
+Dockerfile
+docker-compose.yml
+.dockerignore # This file itself
+
+# Python virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Python bytecode and cache
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE and editor specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*~
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Local instance/media files (if not needed in the image)
+# media/ # If your media files are large and not needed for the build process
+# staticfiles/ # If you collect static files during build, but don't want to copy local ones
+# *.sqlite3 # If you use SQLite for local testing outside Docker
+
+# Environment files (these should be injected, not copied)
+.env
+.env.*
+!.env.example # Keep if you want the example in the image for some reason
+
+# Build artifacts
+build/
+dist/
+*.egg
+
+# Node.js (if you have a frontend build process in the same directory but don't need node_modules in the Python image)
+# node_modules/
+# npm-debug.log
+# yarn-error.log
+
+# Logs
+*.log
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Any other local-specific files or large directories
+# local_data/
+# large_asset_directory/

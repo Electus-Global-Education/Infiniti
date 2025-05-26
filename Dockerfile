@@ -3,8 +3,8 @@
 FROM python:3.13-slim-bookworm
 
 # Set environment variables to prevent Python from writing .pyc files to disc and to buffer output
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set the working directory in the container
 WORKDIR /app
