@@ -59,6 +59,29 @@ services:
       - pgadmin_dev_data:/var/lib/pgadmin # Persist pgAdmin user data and server configurations
     networks:
       - django_network
+  redis:
+    image: redis:7
+    container_name: redis_dev
+    ports:
+      - "6379:6379"
+    networks:
+      - django_network
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    command: celery -A infiniti worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env.django
+    networks:
+      - django_network   
 
 volumes:
   postgres_dev_data: # Defines the named volume for PostgreSQL data

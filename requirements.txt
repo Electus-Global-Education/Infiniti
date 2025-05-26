@@ -30,3 +30,11 @@ whitenoise
 # celery # For asynchronous tasks
 # redis # Often used with Celery as a message broker
 # python-dotenv # Generally not needed if using django-environ and Docker env_file, but sometimes used for local non-Docker scripts
+
+
+redis==5.2.1
+python-dotenv
+google-generativeai==0.8.3
+celery==5.5.2
+djangorestframework-simplejwt
+redis==5.2.1
