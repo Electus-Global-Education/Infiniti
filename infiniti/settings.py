@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import environ # Import django-environ
+from datetime import timedelta      
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent # This should point to your project root (Infiniti/)
@@ -186,7 +187,14 @@ REST_FRAMEWORK = {
     #     'rest_framework.parsers.JSONParser',
     # ),
 }
-
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),   # default is 5 mins
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "ALGORITHM": "HS256",
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
 # --- drf-spectacular Settings (API Documentation) ---
 # https://drf-spectacular.readthedocs.io/en/latest/settings.html
 SPECTACULAR_SETTINGS = {
