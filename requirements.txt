@@ -14,7 +14,6 @@ django-environ # For reading .env files and managing settings
 
 # Django REST Framework and related packages
 djangorestframework>=3.14 # For building REST APIs
-djangorestframework-simplejwt # JWT Authentication
 django-cors-headers # For handling Cross-Origin Resource Sharing (CORS)
 drf-spectacular # For generating OpenAPI 3 schema and Swagger/ReDoc documentation
 
@@ -38,4 +37,18 @@ python-dotenv
 google-generativeai==0.8.3
 celery==5.5.2
 djangorestframework-simplejwt
-redis==5.2.1
+# For Google Cloud Storage integration
+google-auth==2.37.0
+
+# For Google Cloud AI Platform integration
+google-cloud-aiplatform==1.81.0
+#An integration package connecting Google VertexAI and LangChain
+langchain==0.3.16
+langchain-google-vertexai==2.0.13
+google-cloud-bigquery==3.29.0
+google-cloud-datastore==2.20.2
+google-cloud-speech==2.29.0
+google-cloud-texttospeech==2.23.0
+pydub==0.25.1
+sounddevice==0.5.1
+soundfile==0.12.1

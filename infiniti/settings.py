@@ -3,7 +3,9 @@
 import os
 from pathlib import Path
 import environ # Import django-environ
-from datetime import timedelta      
+from datetime import timedelta    
+from dotenv import load_dotenv
+load_dotenv()  
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent # This should point to your project root (Infiniti/)
@@ -51,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles', # Required for static files management
     'edujobs',
+    'baserag', # this app connects to the vector database
 
     # Third-party apps
     'rest_framework',
@@ -219,6 +222,19 @@ CORS_ALLOW_CREDENTIALS = True # If your frontend needs to send cookies/auth head
 # --- CSRF Settings ---
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # Already defined with env
 # Ensure your frontend's domain (including scheme and port if not standard) is listed here if it makes POST/PUT/DELETE requests.
+# Load Gemini settings
+ASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+env_files = [
+    os.path.join(BASE_DIR, ".env_gemini"),
+    os.path.join(BASE_DIR, ".env_vector_store"),
+]
+
+for env_file in env_files:
+    load_dotenv(dotenv_path=env_file, override=True)
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
+
 
 # --- Logging Configuration (Example) ---
 # https://docs.djangoproject.com/en/stable/topics/logging/
@@ -277,10 +293,3 @@ if DATABASES['default']['NAME'] != 'defaultdb_pleasesetenv':
 else:
     print("CRITICAL WARNING: Database is using fallback default. DATABASE_URL not properly set or read.")
 print("--- End of Django Settings ---")
-
-
-# ... other settings ...
-
-LOGIN_URL = 'login'  # This is the name of the URL pattern for the login page (provided by django.contrib.auth.urls)
-LOGIN_REDIRECT_URL = 'core:dashboard'  # After successful login, redirect to the dashboard
-LOGOUT_REDIRECT_URL = 'core:landing_page' # After logout, redirect to the landing page
