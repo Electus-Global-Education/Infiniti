@@ -219,9 +219,6 @@ CORS_ALLOW_CREDENTIALS = True # If your frontend needs to send cookies/auth head
 # --- CSRF Settings ---
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # Already defined with env
 # Ensure your frontend's domain (including scheme and port if not standard) is listed here if it makes POST/PUT/DELETE requests.
-# Load Gemini settings
-from dotenv import load_dotenv
-load_dotenv(dotenv_path=os.path.join(BASE_DIR, ".env_gemini"))
 
 # --- Logging Configuration (Example) ---
 # https://docs.djangoproject.com/en/stable/topics/logging/

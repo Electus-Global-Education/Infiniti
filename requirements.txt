@@ -14,6 +14,7 @@ django-environ # For reading .env files and managing settings
 
 # Django REST Framework and related packages
 djangorestframework>=3.14 # For building REST APIs
+djangorestframework-simplejwt # JWT Authentication
 django-cors-headers # For handling Cross-Origin Resource Sharing (CORS)
 drf-spectacular # For generating OpenAPI 3 schema and Swagger/ReDoc documentation
 
