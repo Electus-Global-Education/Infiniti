@@ -268,3 +268,10 @@ if DATABASES['default']['NAME'] != 'defaultdb_pleasesetenv':
 else:
     print("CRITICAL WARNING: Database is using fallback default. DATABASE_URL not properly set or read.")
 print("--- End of Django Settings ---")
+
+
+# ... other settings ...
+
+LOGIN_URL = 'login'  # This is the name of the URL pattern for the login page (provided by django.contrib.auth.urls)
+LOGIN_REDIRECT_URL = 'core:dashboard'  # After successful login, redirect to the dashboard
+LOGOUT_REDIRECT_URL = 'core:landing_page' # After logout, redirect to the landing page

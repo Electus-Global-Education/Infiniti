@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title_tag_content %}Login - Infiniti Project{% endblock title_tag_content %}
+
+{% block page_specific_css %}
+<style>
+    .login-container {
+        max-width: 450px;
+        margin: 40px auto;
+        padding: 30px;
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .login-container h2 {
+        text-align: center;
+        margin-bottom: 25px;
+        color: #333;
+    }
+    .login-form .form-group {
+        margin-bottom: 20px;
+    }
+    .login-form label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+        color: #555;
+    }
+    .login-form input[type="text"],
+    .login-form input[type="password"] {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box; /* Ensures padding doesn't affect overall width */
+    }
+    .login-form .errorlist {
+        list-style-type: none;
+        padding: 0;
+        color: #d9534f; /* Bootstrap danger color */
+        margin-top: 5px;
+        font-size: 0.9em;
+    }
+    .login-form .errorlist li {
+        margin-bottom: 5px;
+    }
+    .login-form button[type="submit"] {
+        width: 100%;
+        padding: 12px;
+        background-color: #337ab7; /* Bootstrap primary blue */
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s ease;
+    }
+    .login-form button[type="submit"]:hover {
+        background-color: #286090; /* Darker blue */
+    }
+    .login-container .extra-links {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 0.9em;
+    }
+    .login-container .extra-links a {
+        color: #337ab7;
+        text-decoration: none;
+        margin: 0 5px;
+    }
+    .login-container .extra-links a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock page_specific_css %}
+
+{% block main_page_content %}
+<div class="login-container">
+    <h2>Login to Infiniti</h2>
+    {% if form.errors %}
+        <p style="color: red; text-align: center;">Your username and password didn't match. Please try again.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'login' %}" class="login-form">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.username.id_for_label }}">Username:</label>
+            {{ form.username }}
+            {{ form.username.errors }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.password.id_for_label }}">Password:</label>
+            {{ form.password }}
+            {{ form.password.errors }}
+        </div>
+        <button type="submit">Login</button>
+        <input type="hidden" name="next" value="{{ next|default:'core:dashboard' }}">
+    </form>
+    <div class="extra-links">
+        <a href="{% url 'password_reset' %}">Forgot password?</a>
+        {# Add a link to a signup page if you have one #}
+        {# <a href="{% url 'signup' %}">Create an account</a> #}
+    </div>
+</div>
+{% endblock main_page_content %}
+
+{% block left_sidebar_block %}{% endblock left_sidebar_block %}
+{% block right_sidebar_block %}{% endblock right_sidebar_block %}

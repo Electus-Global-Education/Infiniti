@@ -1,79 +1,218 @@
-{% extends "base.html" %} {% load static %}
+{% extends "base.html" %}
+{% load static %}
 
-{% block title_tag_content %}Home - Infiniti Project{% endblock title_tag_content %}
+{% block title_tag_content %}Welcome to Infiniti - Your Intelligent Ecosystem{% endblock title_tag_content %}
 
 {% block page_specific_css %}
-    <style>
-        .hero-section {
-            background-color: #f0f8ff; /* AliceBlue for a light, welcoming feel */
-            padding: 40px 20px;
-            text-align: center;
-            border-bottom: 1px solid #ddd;
-        }
-        .hero-section h1 {
-            color: #2c3e50; /* Dark blue, similar to footer */
-            margin-bottom: 15px;
-        }
-        .features-grid {
-            display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            margin-top: 30px;
-        }
-        .feature-item {
-            background-color: #ffffff;
-            border: 1px solid #e7e7e7;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 10px;
-            width: calc(33.333% - 40px); /* Adjust for spacing */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .feature-item h3 {
-            color: #337ab7; /* Bootstrap primary blue */
-            margin-top: 0;
-        }
-        @media (max-width: 768px) {
-            .feature-item {
-                width: calc(50% - 30px);
-            }
-        }
-        @media (max-width: 576px) {
-            .feature-item {
-                width: calc(100% - 20px);
-            }
-        }
-    </style>
+<style>
+    .landing-hero {
+        background: linear-gradient(135deg, #6e8efb, #a777e3); /* Softer Purple Gradient */
+        color: white;
+        padding: 80px 20px;
+        text-align: center;
+        border-bottom: 5px solid #5a67d8; /* Darker purple accent */
+    }
+    .landing-hero h1 {
+        font-size: 3.5rem;
+        margin-bottom: 20px;
+        font-weight: 700;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    .landing-hero p.lead {
+        font-size: 1.5rem;
+        margin-bottom: 30px;
+        font-weight: 300;
+        max-width: 700px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .btn-cta { /* Call to action button */
+        padding: 15px 30px;
+        font-size: 1.2rem;
+        background-color: #ffc107; /* Amber */
+        color: #333;
+        border: none;
+        border-radius: 50px; /* Pill shape */
+        text-decoration: none;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .btn-cta:hover {
+        background-color: #ffb300; /* Darker amber */
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+
+    .tools-section {
+        padding: 60px 20px;
+        background-color: #ffffff; /* Light background for contrast */
+    }
+    .tools-section h2.section-title {
+        text-align: center;
+        font-size: 2.8rem;
+        margin-bottom: 50px;
+        color: #333;
+        position: relative;
+    }
+    .tools-section h2.section-title::after { /* Underline accent */
+        content: '';
+        display: block;
+        width: 80px;
+        height: 4px;
+        background-color: #6e8efb; /* Primary gradient color */
+        margin: 10px auto 0;
+        border-radius: 2px;
+    }
+
+    .tools-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive grid */
+        gap: 30px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .tool-showcase-card {
+        background-color: #fff;
+        border-radius: 12px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        overflow: hidden; /* For image fitting */
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+    .tool-showcase-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    }
+    .tool-showcase-card .card-image-placeholder { /* Placeholder for tool icon/image */
+        height: 180px;
+        background-color: #e9ecef; /* Light grey */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem; /* Icon size */
+        color: #adb5bd; /* Muted color for icon */
+    }
+    .tool-showcase-card .card-content {
+        padding: 25px;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .tool-showcase-card h3 {
+        font-size: 1.6rem;
+        color: #6e8efb; /* Primary gradient color */
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+    .tool-showcase-card p {
+        font-size: 1rem;
+        color: #555;
+        line-height: 1.6;
+        margin-bottom: 15px;
+        flex-grow: 1;
+    }
+    .tool-showcase-card .btn-learn-more {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #6e8efb;
+        color: white;
+        text-decoration: none;
+        border-radius: 50px;
+        font-weight: 500;
+        transition: background-color 0.3s ease;
+        align-self: flex-start; /* Align button to the start of the flex item */
+    }
+    .tool-showcase-card .btn-learn-more:hover {
+        background-color: #5a67d8; /* Darker shade */
+    }
+
+    /* For icon placeholders - Font Awesome example (ensure you link Font Awesome if used) */
+    /* Or use SVG/image */
+    .fa-search-dollar:before { content: "\f688"; } /* Example for Fund Finder */
+    .fa-hands-helping:before { content: "\f4c4"; } /* Example for Funding Assistant */
+    .fa-pencil-alt:before { content: "\f303"; } /* Example for Content Generator */
+    .fa-brain:before { content: "\f5dc"; } /* Example for Learning Assistant */
+    .fa-chart-line:before { content: "\f201"; } /* Example for Impact Analysis */
+
+</style>
 {% endblock page_specific_css %}
 
 {% block main_page_content %}
-    <div class="hero-section">
-        <h1>{{ page_heading|default:"Welcome to Our Platform!" }}</h1>
-        <p class="lead">{{ featured_message|default:"Explore what we have to offer." }}</p>
-        <a href="#" class="btn btn-primary btn-lg">Get Started</a>
-    </div>
+<div class="landing-hero">
+    <h1>{{ page_heading|default:"Welcome to the Infiniti Ecosystem" }}</h1>
+    <p class="lead">{{ featured_message|default:"Empowering Your Journey with Intelligent Tools." }}</p>
+    {% if not user.is_authenticated %}
+    <a href="{% url 'login' %}" class="btn-cta">Get Started / Login</a>
+    {% else %}
+    <a href="{% url 'core:dashboard' %}" class="btn-cta">Go to Dashboard</a>
+    {% endif %}
+</div>
 
-    <div class="features-grid">
-        <div class="feature-item">
-            <h3>Feature One</h3>
-            <p>Description of the first amazing feature of your platform.</p>
+<section class="tools-section">
+    <h2 class="section-title">Explore Our Intelligent Tools</h2>
+    <div class="tools-grid">
+        <div class="tool-showcase-card">
+            <div class="card-image-placeholder">
+                <i class="fas fa-search-dollar"></i> </div>
+            <div class="card-content">
+                <h3>Fund Finder</h3>
+                <p>Navigate the complex world of funding with ease. Our AI-powered tool helps you discover grants, scholarships, and investment opportunities tailored to your profile and project needs.</p>
+                <a href="#" class="btn-learn-more">Learn More</a>
+            </div>
         </div>
-        <div class="feature-item">
-            <h3>Feature Two</h3>
-            <p>Details about another compelling aspect or service offered.</p>
+
+        <div class="tool-showcase-card">
+            <div class="card-image-placeholder">
+                <i class="fas fa-hands-helping"></i>
+            </div>
+            <div class="card-content">
+                <h3>Funding Assistant</h3>
+                <p>Craft compelling proposals and applications. Get AI-driven suggestions, templates, and feedback to maximize your chances of securing funding.</p>
+                <a href="#" class="btn-learn-more">Learn More</a>
+            </div>
         </div>
-        <div class="feature-item">
-            <h3>Feature Three</h3>
-            <p>Information on a third key benefit or tool available.</p>
+
+        <div class="tool-showcase-card">
+            <div class="card-image-placeholder">
+                <i class="fas fa-pencil-alt"></i>
+            </div>
+            <div class="card-content">
+                <h3>EduJob Content Generator</h3>
+                <p>Effortlessly create high-quality educational materials, job descriptions, and learning content. Save time and produce engaging resources for your audience.</p>
+                <a href="#" class="btn-learn-more">Learn More</a>
+            </div>
+        </div>
+
+        <div class="tool-showcase-card">
+            <div class="card-image-placeholder">
+                <i class="fas fa-brain"></i>
+            </div>
+            <div class="card-content">
+                <h3>Learning Assistant</h3>
+                <p>Your personalized AI study partner. Get help with complex topics, practice quizzes, and tailored learning paths to achieve your educational goals.</p>
+                <a href="#" class="btn-learn-more">Learn More</a>
+            </div>
+        </div>
+
+        <div class="tool-showcase-card">
+            <div class="card-image-placeholder">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="card-content">
+                <h3>Impact Analysis Tool</h3>
+                <p>Measure, visualize, and report the impact of your projects. Understand your contributions and make data-driven decisions for future initiatives.</p>
+                <a href="#" class="btn-learn-more">Learn More</a>
+            </div>
         </div>
     </div>
-
-    <section style="margin-top: 40px; padding: 20px; background-color: #e9ecef; border-radius: 8px;">
-        <h2>More About Us</h2>
-        <p>This section can contain more detailed information about your project, mission, or values. Use this space to engage your visitors further.</p>
-    </section>
+</section>
 {% endblock main_page_content %}
+
+{% block left_sidebar_block %}{% endblock left_sidebar_block %}
+{% block right_sidebar_block %}{% endblock right_sidebar_block %}
 
 {% block page_specific_js %}
     {% endblock page_specific_js %}
