@@ -1,0 +1,26 @@
+{% load static %}
+<nav class="top-navbar">
+    <div class="logo">
+        <a href="{% url 'core:landing_page' %}">
+            <img src="{% static 'images/logo_placeholder.png' %}" alt="Infiniti Logo" style="height: 40px;">
+            <span>Infiniti</span>
+        </a>
+    </div>
+    <ul>
+        <li><a href="{% url 'core:landing_page' %}">Home</a></li>
+        <li><a href="#">About</a></li>
+        <li><a href="#">Services</a></li>
+        <li><a href="#">Contact</a></li>
+        {% if user.is_authenticated %}
+            <li><a href="{% url 'admin:index' %}">Admin</a></li>
+            <li>
+                <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="link-button">Logout ({{ user.username }})</button>
+                </form>
+            </li>
+        {% else %}
+            <li><a href="{% url 'login' %}">Login</a></li>
+            {% endif %}
+    </ul>
+</nav>

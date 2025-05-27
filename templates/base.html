@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title_tag_content %}Infiniti Project{% endblock title_tag_content %}</title>
+
+    <link rel="stylesheet" href="{% static 'css/global_styles.css' %}">
+
+    {% block page_specific_css %}{% endblock page_specific_css %}
+</head>
+<body>
+    <div class="site-container">
+        {% include "partials/_top_navbar.html" %}
+
+        <div class="main-layout">
+            {% block left_sidebar_block %}
+                {% include "partials/_left_sidebar.html" %}
+            {% endblock left_sidebar_block %}
+
+            <main class="main-content">
+                {% block main_page_content %}
+                    <h1>Welcome! (From base.html)</h1>
+                    <p>This is the default main content area from base.html. If you see this, the child template might not be overriding the 'main_page_content' block correctly.</p>
+                {% endblock main_page_content %}
+            </main>
+
+            {% block right_sidebar_block %}
+                {% include "partials/_right_sidebar.html" %}
+            {% endblock right_sidebar_block %}
+        </div>
+
+        {% include "partials/_footer.html" %}
+    </div>
+
+    <script src="{% static 'js/global_scripts.js' %}"></script>
+
+    {% block page_specific_js %}{% endblock page_specific_js %}
+</body>
+</html>
