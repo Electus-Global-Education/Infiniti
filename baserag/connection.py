@@ -3,18 +3,35 @@ import environ
 from vertexai import init as vertexai_init
 from langchain_google_vertexai import VertexAIEmbeddings, VectorSearchVectorStoreDatastore
 
-# Load vector config
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-env = environ.Env()
-env.read_env(os.path.join(BASE_DIR, ".env.vectorstore"))  # or any relevant file
 
-# Read env vars
+# Set the correct path to your service account JSON file
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "keys", "gen-lang-client-0718000543-6dd42a3caf19.json")
+
+# Load environment variables
+env = environ.Env()
+
+# Assuming your .env.vectorstore is in the root directory (same as manage.py)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env.read_env(os.path.join(ROOT_DIR, ".env.vectorstore"))
+
+# Now read the environment variables
 PROJECT_ID = env("PROJECT_ID")
 REGION = env("REGION")
 INDEX_ID = env("INDEX_ID")
 ENDPOINT_ID = env("ENDPOINT_ID")
 EMBEDDING_MODEL_NAME = env("EMBEDDING_MODEL_NAME")
 BUCKET = env("BUCKET")
+
+# print all values
+print("\n--- VECTOR STORE CONFIG ---")
+print(f"PROJECT_ID           = {PROJECT_ID}")
+print(f"REGION               = {REGION}")
+print(f"INDEX_ID             = {INDEX_ID}")
+print(f"ENDPOINT_ID          = {ENDPOINT_ID}")
+print(f"EMBEDDING_MODEL_NAME = {EMBEDDING_MODEL_NAME}")
+print(f"BUCKET               = {BUCKET}")
+print("-----------------------------\n")
+
 # print(f"Using project: {PROJECT_ID}")
 #  Initialize Vertex AI
 vertexai_init(project=PROJECT_ID, location=REGION)

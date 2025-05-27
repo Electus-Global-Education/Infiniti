@@ -226,6 +226,7 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # Already de
 
 # Load Gemini settings
 # Set base directory
+# Set BASE_DIR to the root of the project
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Initialize django-environ
@@ -233,14 +234,17 @@ env = environ.Env()
 
 # List of .env files to load
 env_files = [
-    os.path.join(BASE_DIR, ".env_gemini"),
-    os.path.join(BASE_DIR, ".env_vector_store"),
+    os.path.join(BASE_DIR, ".env.gemini"),
+    os.path.join(BASE_DIR, ".env.vectorstore"),
 ]
 
 # Load all .env files
 for env_file in env_files:
     if os.path.exists(env_file):
         env.read_env(env_file)
+
+# Set Google Application Credentials after .env files are loaded
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = env("GOOGLE_APPLICATION_CREDENTIALS")
 
 # --- Logging Configuration (Example) ---
 # https://docs.djangoproject.com/en/stable/topics/logging/
