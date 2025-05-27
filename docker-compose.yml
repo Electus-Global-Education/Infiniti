@@ -40,8 +40,8 @@ services:
       - "8000:8000" # Map port 8000 on the host to port 8000 in the container
     env_file:
       - ./.env.django
-      - ./.env_vector_store
-      - ./.env_gemini # Load Django specific environment variables
+      - ./.env.vectorstore
+      - ./.env.gemini # Load Django specific environment variables
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service-account.json
     depends_on:
@@ -86,8 +86,8 @@ services:
       - redis
     env_file:
       - .env.django
-      - ./.env_vector_store
-      - ./.env_gemini
+      - ./.env.vectorstore
+      - ./.env.gemini
     environment:  
       - GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service-account.json
     networks:

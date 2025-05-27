@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 import environ # Import django-environ
 from datetime import timedelta    
-from dotenv import load_dotenv
-load_dotenv()  
+# from dotenv import load_dotenv
+# load_dotenv()  
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent # This should point to your project root (Infiniti/)
@@ -241,7 +241,7 @@ env_files = [
 for env_file in env_files:
     if os.path.exists(env_file):
         env.read_env(env_file)
-        
+
 # --- Logging Configuration (Example) ---
 # https://docs.djangoproject.com/en/stable/topics/logging/
 LOGGING = {
