@@ -35,7 +35,7 @@ services:
       # Mount the current directory on the host to /app in the container
       # This allows for real-time code changes without rebuilding the image.
       - .:/app
-      - ./keys:/app/keys
+      - .:/keys:/app/keys
     ports:
       - "8000:8000" # Map port 8000 on the host to port 8000 in the container
     env_file:
@@ -86,8 +86,8 @@ services:
       - redis
     env_file:
       - .env.django
-      - .env.vectorstore
-      - .env.gemini
+      - ./.env.vectorstore
+      - ./.env.gemini
     environment:  
       - GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service-account.json
     networks:
