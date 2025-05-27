@@ -1,19 +1,21 @@
 import os
-from dotenv import load_dotenv
+import environ
 from vertexai import init as vertexai_init
 from langchain_google_vertexai import VertexAIEmbeddings, VectorSearchVectorStoreDatastore
 
 # Load vector config
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env_vector_store'))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env = environ.Env()
+env.read_env(os.path.join(BASE_DIR, ".env.vectorstore"))  # or any relevant file
 
 # Read env vars
-PROJECT_ID = os.getenv("PROJECT_ID")
-REGION = os.getenv("REGION")
-INDEX_ID = os.getenv("INDEX_ID")
-ENDPOINT_ID = os.getenv("ENDPOINT_ID")
-EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME")
-BUCKET = os.getenv("BUCKET")
-
+PROJECT_ID = env("PROJECT_ID")
+REGION = env("REGION")
+INDEX_ID = env("INDEX_ID")
+ENDPOINT_ID = env("ENDPOINT_ID")
+EMBEDDING_MODEL_NAME = env("EMBEDDING_MODEL_NAME")
+BUCKET = env("BUCKET")
+# print(f"Using project: {PROJECT_ID}")
 #  Initialize Vertex AI
 vertexai_init(project=PROJECT_ID, location=REGION)
 

@@ -5,6 +5,12 @@
 .env
 .env.*
 !.env.example # Often good to commit an example .env file
+.env_gemini
+.env_vector_store
+
+#keys
+keys/*
+!keys/.gitkeep
 
 # Django
 *.log

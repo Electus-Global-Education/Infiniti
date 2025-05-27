@@ -6,14 +6,17 @@ import google.generativeai as genai
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from dotenv import load_dotenv
+import environ
 from celery import shared_task
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env_gemini'))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env = environ.Env()
+env.read_env(os.path.join(BASE_DIR, ".env.gemini"))  # or any relevant file
 
-API_KEY = os.getenv("GENAI_API_KEY")
-MODEL = os.getenv("GEMINI_MODEL")
-TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE"))
+API_KEY = env("GENAI_API_KEY")
+MODEL = env("GEMINI_MODEL")
+TEMPERATURE = float(env("GEMINI_TEMPERATURE"))
+print(f"Using Gemini model: {MODEL} with temperature: {TEMPERATURE}")
 
 # Configure Gemini
 try:

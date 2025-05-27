@@ -53,7 +53,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles', # Required for static files management
     'edujobs',
-    'baserag', # this app connects to the vector database
+    'baserag',
+    'fini', # this app connects to the vector database
 
     # Third-party apps
     'rest_framework',
@@ -222,20 +223,25 @@ CORS_ALLOW_CREDENTIALS = True # If your frontend needs to send cookies/auth head
 # --- CSRF Settings ---
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # Already defined with env
 # Ensure your frontend's domain (including scheme and port if not standard) is listed here if it makes POST/PUT/DELETE requests.
-# Load Gemini settings
-ASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Load Gemini settings
+# Set base directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Initialize django-environ
+env = environ.Env()
+
+# List of .env files to load
 env_files = [
     os.path.join(BASE_DIR, ".env_gemini"),
     os.path.join(BASE_DIR, ".env_vector_store"),
 ]
 
+# Load all .env files
 for env_file in env_files:
-    load_dotenv(dotenv_path=env_file, override=True)
-
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
-
-
+    if os.path.exists(env_file):
+        env.read_env(env_file)
+        
 # --- Logging Configuration (Example) ---
 # https://docs.djangoproject.com/en/stable/topics/logging/
 LOGGING = {
