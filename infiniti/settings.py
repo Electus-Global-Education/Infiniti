@@ -19,6 +19,19 @@ env = environ.Env(
     CORS_ALLOWED_ORIGINS=(list, ['http://localhost:3000', 'http://127.0.0.1:3000']), # Example for a React frontend on port 3000
 )
 
+# --- Authentication Settings ---
+# LOGIN_URL: The URL where requests are redirected for login when using the login_required decorator.
+LOGIN_URL = 'login' # This refers to the URL name 'login' from django.contrib.auth.urls
+
+# LOGIN_REDIRECT_URL: The URL where requests are redirected after login if the login view
+# doesn't get a 'next' GET parameter.
+LOGIN_REDIRECT_URL = 'core:dashboard' # Redirects to the 'dashboard' view in the 'core' app
+
+# LOGOUT_REDIRECT_URL: The URL where requests are redirected after logout.
+LOGOUT_REDIRECT_URL = 'core:landing_page' # Redirects to the 'landing_page' view in the 'core' app
+
+# --- Environment Variables ---
+
 # Attempt to read .env file from BASE_DIR.
 # This is primarily for local development if you sometimes run `python manage.py` outside Docker.
 # In Docker, docker-compose injects the environment variables directly from the specified env_file.

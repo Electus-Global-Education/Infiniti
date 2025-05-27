@@ -1,0 +1,12 @@
+{% comment %} templates/partials/_header.html {% endcomment %}
+<header class="site-main-header">
+    {% include "partials/_top_navbar.html" %}
+    {% block page_header_banner %}
+        {# You can add a banner or other header elements here if needed #}
+        {# For example:
+        <div class="header-banner">
+            <h1>Welcome to Infiniti</h1>
+        </div>
+        #}
+    {% endblock page_header_banner %}
+</header>
