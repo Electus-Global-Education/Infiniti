@@ -165,20 +165,8 @@ CELERY_BROKER_URL=redis://redis:6379/0
 * `sounddevice==0.5.1* `
 * `soundfile==0.12.1* `
 
----
 
-## ✅ To Do Next
 
-* Add frontend UI (if needed)
-* Logging and monitoring integration
-* Improve chunk reranking and response generation logic
-* Fine-tune model integration for better domain-specific relevance
-
----
-
-## 🤝 Contributing
-
-Please fork and raise a PR with details. Make sure to follow code formatting and comment best practices.
 
 ---
 
@@ -189,6 +177,3 @@ MIT License. © 2025 Electus-Global-Education
 ```
 
 ---
-
-Let me know if you’d like to generate this file directly in your project or commit it with a changelog summary.
-```
