@@ -4,7 +4,6 @@ from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin # For Class-Based Views that require login
 # from django.contrib.auth.decorators import login_required # For Function-Based Views that require login
 from django.shortcuts import render
-from .utils import generate_gemini_response
 
 # Create your views here.
 from rest_framework.decorators import api_view, permission_classes
@@ -43,37 +42,37 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # For example, recent activity, notifications, etc.
         return context
 
-# Decorator to mark this function as a Django REST framework API view for POST requests only
-@api_view(["POST"])
-# Only allow authenticated users to access this view
-@permission_classes([IsAuthenticated])
-def edujob_view(request):
-    """
-    View for generating responses to education job-related prompts
-    using Google's Gemini language models.
+# # Decorator to mark this function as a Django REST framework API view for POST requests only
+# @api_view(["POST"])
+# # Only allow authenticated users to access this view
+# @permission_classes([IsAuthenticated])
+# def edujob_view(request):
+#     """
+#     View for generating responses to education job-related prompts
+#     using Google's Gemini language models.
 
-    Requires user authentication and a POST request with the prompt
-    and optional model/temperature parameters.
-    """
-    # Extract and validate input data
-    # Get the prompt from the request body and strip whitespace
-    prompt = request.data.get("prompt", "").strip()
-    # Optionally get the requested model name and temperature
-    model_name = request.data.get("model", "").strip()
-    temperature = request.data.get("temperature")
+#     Requires user authentication and a POST request with the prompt
+#     and optional model/temperature parameters.
+#     """
+#     # Extract and validate input data
+#     # Get the prompt from the request body and strip whitespace
+#     prompt = request.data.get("prompt", "").strip()
+#     # Optionally get the requested model name and temperature
+#     model_name = request.data.get("model", "").strip()
+#     temperature = request.data.get("temperature")
 
-    if not prompt:
-        return Response({"error": "Prompt is required."}, status=400)
-    # Call the utility function with prompt, model, and temperature
-    response_text = generate_gemini_response(
-        prompt=prompt,
-        model_name=model_name,
-        temperature=temperature
-    )
-    # Return the response to the client as JSON
-    return Response({
-        #"used_model": model_name if model_name in ALLOWED_MODELS else DEFAULT_MODEL,
-        #"used_temperature": temperature if temperature else DEFAULT_TEMPERATURE,
-        "response": response_text
-    })
+#     if not prompt:
+#         return Response({"error": "Prompt is required."}, status=400)
+#     # Call the utility function with prompt, model, and temperature
+#     response_text = generate_gemini_response(
+#         prompt=prompt,
+#         model_name=model_name,
+#         temperature=temperature
+#     )
+#     # Return the response to the client as JSON
+#     return Response({
+#         #"used_model": model_name if model_name in ALLOWED_MODELS else DEFAULT_MODEL,
+#         #"used_temperature": temperature if temperature else DEFAULT_TEMPERATURE,
+#         "response": response_text
+#     })
 

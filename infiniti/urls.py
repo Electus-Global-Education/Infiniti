@@ -14,10 +14,11 @@ urlpatterns = [
     path('', include('core.urls', namespace='core')),
 
     # Your new API URLs
-    path("api/edujobs/", include("edujobs.urls")), # 'edujobs' is an app with its own urls.py
+    path("api/edujob/", include("edujobs.urls")), # 'edujobs' is an app with its own urls.py
     path("api/vector/", include("baserag.urls")), # 'baserag' is an app
     path("api/fini/", include("fini.urls")),       # 'fini' is an app
     path("api/", include("core.urls")), # 'core' is an app with its own urls.py
+    
 
     # JWT Token Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
