@@ -3,6 +3,15 @@ from django.shortcuts import render
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin # For Class-Based Views that require login
 # from django.contrib.auth.decorators import login_required # For Function-Based Views that require login
+from django.shortcuts import render
+from .utils import generate_gemini_response
+
+# Create your views here.
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from .utils import generate_gemini_response, ALLOWED_MODELS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
+
 
 class LandingPageView(TemplateView):
     """
@@ -33,3 +42,26 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # You can add more context specific to the logged-in user
         # For example, recent activity, notifications, etc.
         return context
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def edujob_view(request):
+    prompt = request.data.get("prompt", "").strip()
+    model_name = request.data.get("model", "").strip()
+    temperature = request.data.get("temperature")
+
+    if not prompt:
+        return Response({"error": "Prompt is required."}, status=400)
+
+    response_text = generate_gemini_response(
+        prompt=prompt,
+        model_name=model_name,
+        temperature=temperature
+    )
+
+    return Response({
+        #"used_model": model_name if model_name in ALLOWED_MODELS else DEFAULT_MODEL,
+        #"used_temperature": temperature if temperature else DEFAULT_TEMPERATURE,
+        "response": response_text
+    })
+

@@ -23,14 +23,14 @@ EMBEDDING_MODEL_NAME = env("EMBEDDING_MODEL_NAME")
 BUCKET = env("BUCKET")
 
 # print all values
-print("\n--- VECTOR STORE CONFIG ---")
-print(f"PROJECT_ID           = {PROJECT_ID}")
-print(f"REGION               = {REGION}")
-print(f"INDEX_ID             = {INDEX_ID}")
-print(f"ENDPOINT_ID          = {ENDPOINT_ID}")
-print(f"EMBEDDING_MODEL_NAME = {EMBEDDING_MODEL_NAME}")
-print(f"BUCKET               = {BUCKET}")
-print("-----------------------------\n")
+# print("\n--- VECTOR STORE CONFIG ---")
+# print(f"PROJECT_ID           = {PROJECT_ID}")
+# print(f"REGION               = {REGION}")
+# print(f"INDEX_ID             = {INDEX_ID}")
+# print(f"ENDPOINT_ID          = {ENDPOINT_ID}")
+# print(f"EMBEDDING_MODEL_NAME = {EMBEDDING_MODEL_NAME}")
+# print(f"BUCKET               = {BUCKET}")
+# print("-----------------------------\n")
 
 # print(f"Using project: {PROJECT_ID}")
 #  Initialize Vertex AI
