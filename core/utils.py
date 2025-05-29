@@ -6,7 +6,7 @@ from functools import lru_cache
 import os
 import environ
 import time
-
+from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding
 # # Load environment variables
 # Get the base directory of the project (two levels up from this file)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -114,3 +114,57 @@ def generate_gemini_response(prompt: str, model_name: str = None, temperature: f
             #     "total_sec": round(time.time() - start_total, 3)
             # }
         }
+
+def generate_llm_response_from_chunks(
+    base_prompt: str,
+    user_query: str,
+    user_role: str,
+    chunks: list,
+    model_name: str = "gemini-2.5-flash-preview-05-20",
+    temperature: float = 0.4
+) -> dict:
+    """
+    Composes a full prompt and sends it to the Gemini LLM.
+    
+    Parameters:
+    - base_prompt: Instructions for the LLM
+    - user_query: The user's actual question
+    - user_role: Role of the user (helps guide the model)
+    - chunks: List of (Document, score) tuples
+    - model_name: Optional Gemini model to use
+    - temperature: Optional generation temperature
+    
+    Returns:
+    - Dictionary with the response and elapsed time
+    """
+    # Ensure valid model
+    if model_name not in ALLOWED_MODELS:
+        raise ValueError(f"Model '{model_name}' is not in the allowed list.")
+
+    # Construct context
+    context_text = "\n".join([doc.page_content for doc, _ in chunks]) if chunks else "No additional context found."
+
+    # Build the full prompt
+    full_prompt = (
+        f"User Role: {user_role}\n"
+        f"Instructions: {base_prompt}\n\n"
+        f"Relevant Context:\n{context_text}\n\n"
+        f"User Question: {user_query}"
+    )
+
+    try:
+        start_time = time.time()
+        genai.configure(api_key=os.getenv("GENAI_API_KEY"))
+        model = genai.GenerativeModel(
+            model_name=model_name,
+            generation_config={"temperature": temperature}
+        )
+        response = model.generate_content(full_prompt)
+        elapsed = round(time.time() - start_time, 2)
+        return {
+            "response": response.text.strip(),
+            "elapsed": f"{elapsed}s"
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise RuntimeError(f"LLM generation failed: {str(e)}")

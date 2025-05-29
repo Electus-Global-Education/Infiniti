@@ -17,7 +17,7 @@ urlpatterns = [
     path("api/edujob/", include("edujobs.urls")), # 'edujobs' is an app with its own urls.py
     path("api/vector/", include("baserag.urls")), # 'baserag' is an app
     path("api/fini/", include("fini.urls")),       # 'fini' is an app
-    path("api/", include("core.urls")), # 'core' is an app with its own urls.py
+    path("api/", include(('core.urls', 'core_api'), namespace='core_api')), # 'core' is an app with its own urls.py
     
 
     # JWT Token Authentication
