@@ -307,12 +307,12 @@ LOGGING = {
 # --- Debugging Print Statements ---
 # These were added for debugging the DATABASE_URL issue.
 # You might want to remove or comment them out for cleaner logs once the issue is resolved.
-print("--- Django Settings Loaded ---")
-print(f"DEBUG: {DEBUG}")
-print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
-print(f"DATABASE_URL from os.getenv at settings load: {os.getenv('DATABASE_URL')}")
-if DATABASES['default']['NAME'] != 'defaultdb_pleasesetenv':
-    print(f"Final DB Config: Name='{DATABASES['default']['NAME']}', User='{DATABASES['default']['USER']}', Host='{DATABASES['default']['HOST']}', Port='{DATABASES['default']['PORT']}'")
-else:
-    print("CRITICAL WARNING: Database is using fallback default. DATABASE_URL not properly set or read.")
-print("--- End of Django Settings ---")
+# print("--- Django Settings Loaded ---")
+# print(f"DEBUG: {DEBUG}")
+# print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+# print(f"DATABASE_URL from os.getenv at settings load: {os.getenv('DATABASE_URL')}")
+# if DATABASES['default']['NAME'] != 'defaultdb_pleasesetenv':
+#     print(f"Final DB Config: Name='{DATABASES['default']['NAME']}', User='{DATABASES['default']['USER']}', Host='{DATABASES['default']['HOST']}', Port='{DATABASES['default']['PORT']}'")
+# else:
+#     print("CRITICAL WARNING: Database is using fallback default. DATABASE_URL not properly set or read.")
+# print("--- End of Django Settings ---")
