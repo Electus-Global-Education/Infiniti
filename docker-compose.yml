@@ -33,6 +33,7 @@ services:
       # This allows for real-time code changes without rebuilding the image.
       - .:/app
       - .:/keys:/app/keys
+      - ./staticfiles:/app/staticfiles
     ports:
       - "127.0.0.1:8000:8000" # Map port 8000 on the host to port 8000 in the container
     env_file:
