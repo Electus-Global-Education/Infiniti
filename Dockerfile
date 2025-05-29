@@ -1,61 +1,100 @@
-# Dockerfile
-# Use an official Python runtime based on Debian Bookworm
-FROM python:3.13-slim-bookworm
+# Dockerfile (Production Ready)
+
+# --- Builder Stage ---
+# This stage installs build dependencies, Python packages, copies app code,
+# and collects static files.
+FROM python:3.13-slim-bookworm AS builder
 
 # Set environment variables to prevent Python from writing .pyc files to disc and to buffer output
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# It's good practice to set DJANGO_SETTINGS_MODULE here too if any manage.py commands need it
+ENV DJANGO_SETTINGS_MODULE=infiniti.settings
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies using apt-get
+# Install build-time system dependencies (for compiling Python packages)
+# and core runtime dependencies that might be needed by Python packages during installation.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       bash \
-       postgresql-client \
        build-essential \
        libpq-dev \
        libjpeg-dev \
        zlib1g-dev \
        gettext \
-       # Add other system dependencies as needed, for example:
-       # libxml2-dev libxslt1-dev (for lxml or similar)
-       # git (if you need to pull from git during build)
+       bash \
+       # postgresql-client is useful for manage.py dbshell or custom scripts,
+       # but not strictly required if only psycopg2 is used by the app.
+       # If included, ensure libpq5 is in the final stage.
+       postgresql-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements.txt and install Python dependencies
+# These will be installed into the system Python of this builder stage.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the entire application source code
+# Ensure you have a .dockerignore file to exclude unnecessary files/folders
+# (e.g., .git, .venv, __pycache__, local .env files, IDE folders)
+COPY . .
+
+# Collect static files
+# This will gather static files into the directory specified by STATIC_ROOT in settings.py
+# (which should be something like /app/staticfiles).
+RUN python manage.py collectstatic --noinput --clear
+
+
+# --- Final Runtime Stage ---
+# This stage builds the final, smaller image with only runtime necessities.
+FROM python:3.13-slim-bookworm AS final
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=infiniti.settings
+ENV PYTHONIOENCODING=UTF-8
+
+WORKDIR /app
+
+# Install only essential runtime system dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libpq5 \
+       gettext \
+       bash \
+       # Add other minimal runtime dependencies if absolutely necessary
+       # e.g., libjpeg (libjpeg62-turbo) if Pillow needs it and it's not statically linked
+       # Usually, Python wheels handle this, or they were linked in the builder stage.
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user and group for security
-# Using standard Debian commands
-RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -d /app -s /bin/bash appuser
-# The /app directory will be created by WORKDIR.
+RUN groupadd -r appgroup --gid 1001 && \
+    useradd --no-log-init -r -g appgroup --uid 1001 -d /app -s /bin/bash appuser
 
-# Copy only requirements.txt first to leverage Docker cache for dependencies
-COPY requirements.txt /app/
+# Copy installed Python packages from the builder stage
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+# Copy executables installed by pip (like gunicorn) from the builder stage
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Install Python dependencies
-# Ensure permissions are correct if running pip as root and then switching user.
-# Alternatively, create user first, then copy files and run pip as that user.
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the application code (which now includes collected static files) from the builder stage
+COPY --from=builder /app /app
 
-# Copy the rest of the application code into the container
-# This will be largely overridden by the volume mount in docker-compose.yml for development,
-# but it's good practice for building standalone images.
-COPY . /app/
+# Create mediafiles directory if it doesn't exist and ensure appuser owns app directories
+# staticfiles directory should have been created by collectstatic and copied from builder.
+RUN mkdir -p /app/mediafiles && \
+    chown -R appuser:appgroup /app
 
-# Change ownership of the app directory to the appuser
-# This is important if you are not mounting a volume from the host that overrides these permissions.
-RUN chown -R appuser:appgroup /app
-
-# Switch to the non-root user for running the application
+# Switch to the non-root user
 USER appuser
 
-# Expose the port Gunicorn will run on (default for Django dev server is also 8000)
+# Expose the port Gunicorn will run on
 EXPOSE 8000
 
-# Default command to run the application.
-# For development, we'll override this in docker-compose.yml to use Django's runserver.
-# For production, you'd use Gunicorn here.
-# CMD ["gunicorn", "--bind", "0.0.0.0:8000", "infiniti.wsgi:application"]
-# For now, let's make it run the dev server if no command is specified in docker-compose.
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Command to run the application using Gunicorn
+# Adjust --workers based on your server's CPU cores (typically 2-4 workers per core)
+# For a typical small server, 2-4 workers might be a good start.
+# Ensure infiniti.wsgi:application points to your WSGI application object.
+CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "infiniti.wsgi:application"]
