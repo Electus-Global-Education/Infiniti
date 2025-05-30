@@ -23,6 +23,7 @@ env = environ.Env(
     GOOGLE_APPLICATION_CREDENTIALS=(str, '')
 )
 
+AUTH_USER_MODEL = 'core.User'
 # --- Authentication Settings ---
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'core:dashboard'
@@ -73,7 +74,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
-    'rest_framework_simplejwt', # Added based on your previous settings
+    'rest_framework_simplejwt',
     'core.apps.CoreConfig',
 ]
 
