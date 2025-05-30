@@ -18,8 +18,6 @@ DEFAULT_MODEL = "gemini-2.5-flash-preview-05-20"
 DEFAULT_TEMPERATURE = 0.4
 DEFAULT_BASE_PROMPT = (
     "You are an intelligent assistant that provides helpful, clear, and concise answers "
-    "based on the given context and user question.Do not make up information or provide opinions. "
-    "If the context does not contain relevant information, respond with 'I don't have knowledge about' or 'Or its outside of my knowledge scope.'"
 )
 
 @api_view(["POST"])
@@ -120,7 +118,12 @@ class FiniLLMChatView(APIView):
 
             # Join the page content from retrieved chunks to build context
             context_text = "\n".join([doc.page_content for doc, _ in chunks]) if chunks else "No relevant context found."
-
+            # Inject clear instruction to LLM not to mention relevance even if context is not useful
+            context_instruction = (
+            "Use the context below if it is helpful. "
+            "If the context does not answer the question, respond using your general knowledge. "
+            "Do NOT mention anything about context being missing or irrelevant."
+            )
             # --------------------------------------------- #
             # Step 4: Compose the Full Prompt for the LLM   #
             # --------------------------------------------- #
@@ -130,6 +133,7 @@ class FiniLLMChatView(APIView):
                 f"User ID: {user_id}\n"
                 f"User Role: {user_role}\n"
                 f"Instructions: {base_prompt}\n\n"
+                f"Relevant Context Instrustions: \n{context_instruction}\n\n"
                 f"Relevant Context:\n{context_text}\n\n"
                 f"User Question: {cleaned_query}"
             )
@@ -149,6 +153,7 @@ class FiniLLMChatView(APIView):
                 "response": result.get("response", "[No response]"),
                 "meta": {
                     "user_query": cleaned_query,
+                    "context instruction": context_instruction,
                     "model": model_name,
                     "temperature": temperature,
                     "base_prompt": base_prompt,
