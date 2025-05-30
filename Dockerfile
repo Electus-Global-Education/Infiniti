@@ -27,8 +27,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user and group for security
-RUN groupadd -r appgroup --gid 1001 && \
-    useradd --no-log-init -r -g appgroup --uid 1001 -d /app -s /bin/bash appuser
+# RUN groupadd -r appgroup --gid 1001 && \
+#     useradd --no-log-init -r -g appgroup --uid 1001 -d /app -s /bin/bash appuser
+ARG APP_USER_UID=1000
+ARG APP_GROUP_GID=1000
+RUN groupadd -r appgroup --gid ${APP_GROUP_GID} && \
+    useradd --no-log-init -r -g appgroup --uid ${APP_USER_UID} -d /app -s /bin/bash appuser
 
 # Copy requirements.txt first to leverage Docker cache for this layer if requirements don't change
 COPY requirements.txt ./
@@ -53,7 +57,7 @@ COPY . .
 RUN mkdir -p /app/staticfiles /app/mediafiles && \
     chown -R appuser:appgroup /app
 
-# Switch to the non-root user before running collectstatic and for the final CMD
+# Switch to the non-root user
 USER appuser
 
 # Collect static files as the appuser
