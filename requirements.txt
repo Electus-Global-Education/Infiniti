@@ -52,3 +52,8 @@ google-cloud-texttospeech==2.23.0
 pydub==0.25.1
 sounddevice==0.5.1
 soundfile==0.12.1
+requests==2.32.3
+google-cloud-storage==2.19.0
+youtube-transcript-api==0.6.3
+python-docx==1.1.2
+PyPDF2==3.0.1
