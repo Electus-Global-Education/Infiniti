@@ -16,6 +16,8 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ['127.0.0.1', 'localhost']),
     CSRF_TRUSTED_ORIGINS=(list, ['http://localhost:8000', 'http://127.0.0.1:8000']),
     CORS_ALLOWED_ORIGINS=(list, ['http://localhost:3000', 'http://127.0.0.1:3000']),
+    CELERY_BROKER_URL=(str, "redis://redis:6379/0"),
+    CELERY_BACKEND_URL=(str, "redis://redis:6379/1"),
     # Add a default for GOOGLE_APPLICATION_CREDENTIALS for build time.
     # The runtime value will be set by docker-compose's environment directive.
     # An empty string should be fine if it's not strictly needed for settings.py to load
@@ -35,6 +37,9 @@ ENV_FILE_PATH = BASE_DIR / '.env.django'
 if os.path.exists(ENV_FILE_PATH):
     print(f"INFO: Reading environment variables from: {ENV_FILE_PATH}")
     environ.Env.read_env(ENV_FILE_PATH) # Reads into os.environ and django-environ's cache
+
+CELERY_BROKER_URL     = env("CELERY_BROKER_URL")
+CELERY_RESULT_BACKEND = env("CELERY_BACKEND_URL")
 
 # Load other .env files like .env.gemini, .env.vectorstore IF THEY EXIST
 # These files must be copied into the Docker image if they are expected during build
