@@ -1,15 +1,15 @@
 # fini/views.py
 # from .models import Prompt
+import time
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
-import time
-
+from celery.result import AsyncResult
 from core.utils import generate_gemini_response
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding #generate_llm_response_from_chunks
-from .utils import fetch_youtube_transcript, preprocess_text
+from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task
 
 
 # Default fallback values
@@ -262,7 +262,142 @@ class YouTubeTranscriptAPIView(APIView):
             "total_elapsed": total_elapsed,
         }
         return Response(response_payload, status=status.HTTP_200_OK)
+class YouTubeTranscriptAPIView(APIView):
+    """
+    (Unchanged except for ensuring we’ve already used `fetch_youtube_transcript`
+     + `preprocess_text` as before.)
+    """
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, dict):
+            return Response(
+                {"error": "`{}` body must be a JSON object with a key 'urls'".format(data)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        video_urls = data.get("urls")
+        if not isinstance(video_urls, list):
+            return Response(
+                {"error": "`urls` must be a list of YouTube video URLs."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        raw_texts = {}
+        cleaned_transcripts = {}
+        failed_urls = []
+        elapsed_times = {}
+
+        total_start = time.perf_counter()
+
+        for url in video_urls:
+            per_start = time.perf_counter()
+            transcript_text = fetch_youtube_transcript(url)
+            per_end = time.perf_counter()
+
+            raw_texts[url] = transcript_text
+            elapsed_times[url] = per_end - per_start
+
+            if transcript_text is None:
+                failed_urls.append(url)
+            else:
+                cleaned_transcripts[url] = preprocess_text(transcript_text)
+
+        total_elapsed = time.perf_counter() - total_start
+
+        return Response({
+            "raw_texts": raw_texts,
+            "cleaned_transcripts": cleaned_transcripts,
+            "failed_urls": failed_urls,
+            "elapsed_times": elapsed_times,
+            "total_elapsed": total_elapsed,
+        }, status=status.HTTP_200_OK)
+
+
+class ProcessVideoChunksAPIView(APIView):
+    """
+    Accepts a POST with JSON body: { "urls": [ "<youtube_url1>", "<youtube_url2>", ... ] }.
+    Requires authentication.
+
+    For each URL:
+      - We enqueue a Celery task (`process_video_chunks_task.delay(video_url)`).
+      - Return immediately a JSON mapping of { url: <celery_task_id> }.
+
+    The Celery worker(s) will process each URL one by one in the background,
+    performing chunking → embedding → similarity check → insertion.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, dict):
+            return Response(
+                {"error": "Request body must be a JSON object with a key 'urls'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        video_urls = data.get("urls")
+        if not isinstance(video_urls, list):
+            return Response(
+                {"error": "`urls` must be a list of YouTube video URLs."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        task_map = {}
+        for url in video_urls:
+            # Enqueue one Celery task per URL
+            async_result = process_video_chunks_task.delay(url)
+            task_map[url] = async_result.id
+
+        return Response(
+            {
+                "message": "Chunk/embedding tasks have been queued.",
+                "tasks": task_map
+            },
+            status=status.HTTP_202_ACCEPTED
+        )
+
+
+class CheckTaskStatusAPIView(APIView):
+    """
+    (Optional helper endpoint)
+    Given a POST with { "task_id": "<celery_task_id>" }, returns the task state
+    and (if finished) the result dictionary from `process_video_chunks_task`.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        task_id = data.get("task_id")
+        if not isinstance(task_id, str):
+            return Response(
+                {"error": "`task_id` must be provided as a string."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        async_result = AsyncResult(task_id)
+        if not async_result:
+            return Response(
+                {"error": f"No such task with id '{task_id}'."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response_data = {
+            "task_id": task_id,
+            "status": async_result.status,  # e.g. "PENDING", "STARTED", "SUCCESS", "FAILURE"
+        }
+        if async_result.ready():
+            # If the task finished (either SUCCESS or FAILURE),
+            # return its result or exception info
+            try:
+                response_data["result"] = async_result.get(timeout=1)
+            except Exception as e:
+                response_data["error"] = str(e)
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 # @api_view(["POST"])
 # @permission_classes([IsAuthenticated])
