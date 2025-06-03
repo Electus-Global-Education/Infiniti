@@ -9,7 +9,7 @@ from rest_framework import status
 from celery.result import AsyncResult
 from core.utils import generate_gemini_response
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding #generate_llm_response_from_chunks
-from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task
+from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task, process_boclips_video_task
 
 
 # Default fallback values
@@ -392,6 +392,77 @@ class CheckTaskStatusAPIView(APIView):
         if async_result.ready():
             # If the task finished (either SUCCESS or FAILURE),
             # return its result or exception info
+            try:
+                response_data["result"] = async_result.get(timeout=1)
+            except Exception as e:
+                response_data["error"] = str(e)
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+class ProcessBoclipsChunksAPIView(APIView):
+    """
+    POST { "video_ids": ["id1", "id2", ... ] }
+    Requires authentication. Enqueues a separate Celery task per Boclips video ID.
+    Responds with { video_id: task_id, ... } and 202 Accepted.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, dict):
+            return Response(
+                {"error": "Request body must be a JSON object with a key 'video_ids'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        video_ids = data.get("video_ids")
+        if not isinstance(video_ids, list):
+            return Response(
+                {"error": "`video_ids` must be a list of Boclips video IDs (strings)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        task_map = {}
+        for vid in video_ids:
+            async_result = process_boclips_video_task.delay(vid)
+            task_map[vid] = async_result.id
+
+        return Response(
+            {
+                "message": "Boclips chunk/embedding tasks have been queued.",
+                "tasks": task_map,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class CheckBoclipsTaskStatusAPIView(APIView):
+    """
+    POST { "task_id": "<celery_task_id>" }
+    Returns { task_id, status, (result|error) } for a Boclips task.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        task_id = data.get("task_id")
+        if not isinstance(task_id, str):
+            return Response(
+                {"error": "`task_id` must be provided as a string."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        async_result = AsyncResult(task_id)
+        if not async_result:
+            return Response(
+                {"error": f"No such task with id '{task_id}'."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response_data = {"task_id": task_id, "status": async_result.status}
+        if async_result.ready():
             try:
                 response_data["result"] = async_result.get(timeout=1)
             except Exception as e:
