@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import get_query_embedding_view as get_query_embedding
-from .views import retrieve_top_chunks, FiniLLMChatView, YouTubeTranscriptAPIView, ProcessVideoChunksAPIView, CheckTaskStatusAPIView, ProcessBoclipsChunksAPIView, CheckBoclipsTaskStatusAPIView
+from .views import retrieve_top_chunks, FiniLLMChatView, YouTubeTranscriptAPIView, ProcessVideoChunksAPIView, CheckTaskStatusAPIView, ProcessBoclipsChunksAPIView, CheckBoclipsTaskStatusAPIView, UploadDocumentAPIView, CheckDocumentTaskStatusAPIView
 
 urlpatterns = [
     path("embedding/", get_query_embedding),
@@ -13,4 +13,7 @@ urlpatterns = [
     path("YTtask-status/", CheckTaskStatusAPIView.as_view(), name="YTtask-status"),
     path("process-boclips-chunks/", ProcessBoclipsChunksAPIView.as_view(), name="process-boclips-chunks"),
     path("boclips-task-status/", CheckBoclipsTaskStatusAPIView.as_view(), name="boclips-task-status"),
+    path("upload-document/", UploadDocumentAPIView.as_view(), name="upload-document"),
+    path("check-document-task/", CheckDocumentTaskStatusAPIView.as_view(), name="check-document-task"),
+
 ]

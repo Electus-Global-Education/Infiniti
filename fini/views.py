@@ -1,6 +1,10 @@
 # fini/views.py
 # from .models import Prompt
+import os
 import time
+from uuid import uuid4
+from django.conf import settings
+from django.core.files.storage import default_storage
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -9,7 +13,7 @@ from rest_framework import status
 from celery.result import AsyncResult
 from core.utils import generate_gemini_response
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding #generate_llm_response_from_chunks
-from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task, process_boclips_video_task
+from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task, process_boclips_video_task, process_document_task
 
 
 # Default fallback values
@@ -469,6 +473,101 @@ class CheckBoclipsTaskStatusAPIView(APIView):
                 response_data["error"] = str(e)
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class UploadDocumentAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Expects a multipart/form-data POST with a single file under "document":
+          - document: (file.obj, content_type either application/pdf or application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+
+        Returns:
+          {
+            "message": "Enqueued document for processing.",
+            "task_id": "<celery-task-id>"
+          }
+        """
+        # 1) Validate file presence
+        uploaded_file = request.FILES.get("document")
+        if not uploaded_file:
+            return Response(
+                {"error": "No file provided under 'document'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2) Check extension
+        filename = uploaded_file.name
+        _, ext = os.path.splitext(filename.lower())
+        if ext not in (".docx", ".pdf"):
+            return Response(
+                {"error": "Unsupported file type. Only .docx and .pdf are allowed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3) Save file to MEDIA_ROOT with a random prefix to avoid collisions
+        random_prefix = uuid4().hex
+        safe_filename = f"{random_prefix}_{filename}"
+        save_path = os.path.join(settings.MEDIA_ROOT, safe_filename)
+
+        try:
+            with default_storage.open(save_path, "wb+") as destination:
+                for chunk in uploaded_file.chunks():
+                    destination.write(chunk)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to save uploaded file: {e}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # 4) Enqueue the Celery task, passing both file_path and original filename
+        task = process_document_task.delay(save_path, filename)
+
+        return Response(
+            {
+                "message": "Enqueued document for processing.",
+                "task_id": task.id,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+# fini/views.py  (append after UploadDocumentAPIView)
+
+class CheckDocumentTaskStatusAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Expects JSON body: { "task_id": "<celery-task-id>" }
+
+        Returns:
+          {
+            "task_id": "<celery-task-id>",
+            "status": "<PENDING|SUCCESS|FAILURE>",
+            "result": { …same dict returned by process_document_task… }  # only if ready
+          }
+        """
+        data = request.data
+        task_id = data.get("task_id")
+        if not isinstance(task_id, str):
+            return Response(
+                {"error": "`task_id` must be provided as a string."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        async_result = AsyncResult(task_id)
+        response_data = {"task_id": task_id, "status": async_result.status}
+
+        if async_result.ready():
+            try:
+                response_data["result"] = async_result.get(timeout=1)
+            except Exception as e:
+                response_data["error"] = str(e)
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
 
 # @api_view(["POST"])
 # @permission_classes([IsAuthenticated])

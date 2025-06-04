@@ -4,6 +4,10 @@ import os
 import time
 import environ
 import requests
+import tempfile
+import traceback
+from docx import Document as DocxDocument
+from PyPDF2 import PdfReader
 from baserag.connection import embedding_model, vector_store
 from typing import List, Dict, Optional, Tuple
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
@@ -629,6 +633,156 @@ def process_boclips_video_task(video_ref: str) -> Dict[str, object]:
     # 7) Final elapsed time
     result["elapsed_time"] = time.perf_counter() - start_time
     return result  
+
+# ──────────────────────────────────────────────────────────────────────────────
+# A) Extract text from DOCX
+# ──────────────────────────────────────────────────────────────────────────────
+def extract_text_from_docx(path: str) -> str:
+    """
+    Open a .docx file at `path` and return all paragraphs joined as a single string.
+    """
+    try:
+        doc = DocxDocument(path)
+        full_text = []
+        for para in doc.paragraphs:
+            full_text.append(para.text)
+        return "\n".join(full_text)
+    except Exception as e:
+        raise Exception(f"Error extracting DOCX text: {e}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# B) Extract text from PDF
+# ──────────────────────────────────────────────────────────────────────────────
+def extract_text_from_pdf(path: str) -> str:
+    """
+    Open a .pdf file at `path` using PyPDF2 and return the concatenation of all page texts.
+    """
+    try:
+        reader = PdfReader(path)
+        all_text = []
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                all_text.append(text)
+        return "\n".join(all_text)
+    except Exception as e:
+        raise Exception(f"Error extracting PDF text: {e}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# C) Celery task: process a document (DOCX or PDF), chunk, embed, dedupe, insert
+# ──────────────────────────────────────────────────────────────────────────────
+@shared_task
+def process_document_task(file_path: str, original_filename: str) -> Dict[str, object]:
+    """
+    1) Determine file type by extension (.docx or .pdf)
+    2) Extract text accordingly
+    3) Preprocess → chunk → embed → dedupe → insert into vector_store
+    4) Delete the uploaded file (whether success or error)
+    5) Return a dict summarizing:
+         - total_chunks
+         - inserted_ids
+         - skipped (list of {chunk_index, score})
+         - skipped_count
+         - elapsed_time
+         - error (if any)
+    """
+    start_time = time.perf_counter()
+    result: Dict[str, object] = {
+        "original_filename": original_filename,
+        "total_chunks": 0,
+        "inserted_ids": [],
+        "skipped": [],
+        "skipped_count": 0,
+        "elapsed_time": 0.0,
+        "error": None,
+    }
+
+    try:
+        # 1) Extract raw text based on extension
+        _, ext = os.path.splitext(original_filename.lower())
+        if ext == ".docx":
+            raw_text = extract_text_from_docx(file_path)
+        elif ext == ".pdf":
+            raw_text = extract_text_from_pdf(file_path)
+        else:
+            raise Exception(f"Unsupported file extension: {ext}")
+
+        if not raw_text.strip():
+            result["error"] = "No text extracted from file."
+            return result
+
+        # 2) Preprocess text (reuse existing function)
+        cleaned = preprocess_text(raw_text)
+
+        # 3) Create semantic chunks (reuse existing function)
+        chunks = create_semantic_chunks(cleaned)
+        result["total_chunks"] = len(chunks)
+
+        # 4) Deduplication and embedding logic (similar to Boclips pipeline)
+        #    We’ll use a prefix based on filename (to avoid ID collisions):
+        safe_filename = os.path.splitext(os.path.basename(original_filename))[0]
+        prefix = f"doc_{safe_filename}_chunk_"
+
+        # 4a) Check existing IDs in vector_store with that prefix
+        try:
+            existing_ids = vector_store.search_ids_by_prefix(prefix)
+        except AttributeError:
+            existing_ids = []
+
+        if existing_ids:
+            numeric_indices = [
+                int(idx.replace(prefix, "")) 
+                for idx in existing_ids 
+                if idx.startswith(prefix) and idx.replace(prefix, "").isdigit()
+            ]
+            next_index = max(numeric_indices) + 1 if numeric_indices else 0
+        else:
+            next_index = 0
+
+        # 4b) Iterate each chunk, embed, dedupe, insert
+        for i, chunk_text in enumerate(chunks):
+            new_embedding = embedding_model.embed_documents([chunk_text])[0]
+            results = vector_store.similarity_search_by_vector_with_score(new_embedding, k=1)
+
+            if results:
+                existing_doc, score = results[0]
+                if score >= 0.90:
+                    # Skip this chunk
+                    result["skipped"].append({"chunk_index": i, "score": score})
+                    result["skipped_count"] += 1
+                    continue
+
+            # Otherwise, insert as new
+            new_id = f"{prefix}{next_index}"
+            next_index += 1
+
+            metadata = {
+                "text": chunk_text,
+                "chunk_text": chunk_text,
+                "chunk_index": i,
+                "source_file": safe_filename,
+                "original_filename": original_filename,
+            }
+
+            vector_store.add_texts([chunk_text], metadatas=[metadata], ids=[new_id])
+            result["inserted_ids"].append(new_id)
+
+    except Exception as e:
+        # Capture the stack trace for debugging
+        result["error"] = f"{e}\n{traceback.format_exc()}"
+    finally:
+        # 5) Always delete the file after processing
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            # Ignore deletion errors
+            pass
+
+        result["elapsed_time"] = time.perf_counter() - start_time
+        return result
 
 # def generate_llm_response_from_chunks(base_prompt: str, user_query: str, user_role: str, chunks: list) -> str:
 #     """
