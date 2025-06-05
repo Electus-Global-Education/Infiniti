@@ -2,6 +2,7 @@
 # from .models import Prompt
 import os
 import time
+import traceback
 from uuid import uuid4
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -11,10 +12,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from celery.result import AsyncResult
-from core.utils import generate_gemini_response
+from core.utils import generate_gemini_response, generate_audio_response
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding #generate_llm_response_from_chunks
 from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task, process_boclips_video_task, process_document_task
-
+from celery import shared_task
 
 # Default fallback values
 DEFAULT_ROLE = "Student"
@@ -102,6 +103,9 @@ class FiniLLMChatView(APIView):
         temperature = data.get("temperature", DEFAULT_TEMPERATURE)
         base_prompt = data.get("base_prompt", DEFAULT_BASE_PROMPT)
 
+        # 3) Check if audio is requested
+        want_audio = bool(data.get("audio", False))
+
         try:
             # ----------------------------- #
             # Step 1: Generate Embedding    #
@@ -151,11 +155,13 @@ class FiniLLMChatView(APIView):
             # Send prompt to Gemini model and receive generated response
             result = generate_gemini_response(prompt, model_name, temperature)
             llm_time = time.time() - llm_start
+            # **Important**: extract the actual text reply from the LLM’s response dict
+            text_reply = result.get("response", "[No response]")
             total_time = time.time() - start
 
-            # Return final response with metadata and timing diagnostics
-            return Response({
-                "response": result.get("response", "[No response]"),
+            #Build base response payload (text + meta)
+            payload = {
+                "response": text_reply,
                 "meta": {
                     "user_query": cleaned_query,
                     "context instruction": context_instruction,
@@ -168,14 +174,77 @@ class FiniLLMChatView(APIView):
                         "embedding_sec": round(embed_time, 3),
                         "retrieval_sec": round(chunk_time, 3),
                         "llm_generation_sec": round(llm_time, 3),
-                        "total_sec": round(total_time, 3)
+                        "total_sec": round(total_time, 3),
                     }
                 }
-            })
+            }
+
+            # 7) If audio requested, generate and attach it
+            if want_audio:
+                # .delay() will immediately return a task AsyncResult
+                tts_job = generate_tts_task.delay(text_reply)
+                payload["tts_task_id"] = tts_job.id
+
+            return Response(payload, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class TTSStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        POST /api/fini/tts-status/
+        Body: { "task_id": "<celery‐task‐id>" }
+
+        Returns:
+          {
+            "task_id": "...",
+            "status": "PENDING" | "SUCCESS" | "FAILURE",
+            "audio": "<base64 string>"   # only if status == "SUCCESS"
+            "error": "..."               # only if status == "FAILURE"
+          }
+        """
+        task_id = request.data.get("task_id")
+        if not isinstance(task_id, str):
+            return Response(
+                {"error": "`task_id` must be provided as a string."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        async_res = AsyncResult(task_id)
+        response_data = {"task_id": task_id, "status": async_res.status}
+
+        if async_res.ready():
+            if async_res.successful():
+                # The Celery task returned {"audio_b64": "..."}
+                res = async_res.result or {}
+                response_data["audio"] = res.get("audio_b64", "")
+            else:
+                # Celery task failed
+                response_data["error"] = str(async_res.result)
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+@shared_task(bind=True)
+def generate_tts_task(self, text: str) -> dict:
+    """
+    Celery task that takes a text string, sends it to Google TTS,
+    and returns a dict containing the base64‐encoded audio.
+    """
+    print(f"[generate_tts_task] Received text to speak: {repr(text)}")
+    try:
+        audio_b64 = generate_audio_response(text)
+        print(f"[generate_tts_task] Audio length (bytes): {len(audio_b64)}")
+        return {"audio_b64": audio_b64}
+    except Exception as e:
+        # If you want to automatically retry on failure:
+        # raise self.retry(exc=e, countdown=5, max_retries=2)
+        # Otherwise, just bubble up the exception so the client sees FAILURE:
+        print(f"[generate_tts_task] ERROR: {e}")
+        raise Exception(f"TTS task failed: {e}\n{traceback.format_exc()}")
 
 class YouTubeTranscriptAPIView(APIView):
     """
