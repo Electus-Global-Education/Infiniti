@@ -10,13 +10,12 @@ class Command(BaseCommand):
     Django management command to fetch grant opportunities from Grants.gov.
 
     This command uses the GrantsGovAPIClient to search for grants, then populates
-    the FunderProfile and GrantOpportunity models in the local database.
-
-    It can be run manually or automated via a cron job for regular updates.
+    the FunderProfile and GrantOpportunity models in the local database. It uses
+    the 'opportunityId' from the API as a unique source ID to prevent duplicates.
 
     Example usage:
-    - python manage.py fetch_grants_gov
-    - python manage.py fetch_grants_gov --keyword "health" --rows 100
+    - python manage.py fetch_grants_gov --rows 25
+    - python manage.py fetch_grants_gov --keyword "health" --rows 100 --update-details
     """
     help = 'Fetches grant opportunities from Grants.gov and saves them to the database.'
 
@@ -70,39 +69,32 @@ class Command(BaseCommand):
 
                 # --- Step 2: Get or Create the Funder Profile ---
                 agency_name = grant_summary.get('agencyName', 'Unknown Funder').strip()
-                funder, created = FunderProfile.objects.get_or_create(
+                funder, _ = FunderProfile.objects.get_or_create(
                     name=agency_name,
                     defaults={'funder_type': 'Government'}
                 )
-                if created:
-                    self.stdout.write(f"Created new funder: {agency_name}")
 
                 # --- Step 3: Fetch Detailed Info (Optional) ---
                 grant_details = grant_summary # Start with summary data
                 if fetch_details:
                     try:
                         self.stdout.write(f"Fetching details for ID: {opportunity_id}...")
-                        # The detailed response often contains the summary fields plus more.
-                        # The API might return a list, so we handle that case.
+                        # The detailed response often has a slightly different structure
                         detailed_response = client.fetch_opportunity_details(opportunity_id)
-                        if isinstance(detailed_response, dict) and detailed_response.get('opps'):
-                            grant_details = detailed_response['opps'][0]
+                        # The detailed data is often in a 'synopsis' or similar key
+                        synopsis = detailed_response.get('synopsis', {})
+                        if synopsis:
+                             grant_details.update(synopsis) # Merge detailed data into our grant_details dict
                         else:
-                            # Handle cases where the structure might be different
-                            grant_details = detailed_response
+                             grant_details.update(detailed_response) # Fallback to merging the whole response
                     except Exception as e:
-                        self.stderr.write(self.style.ERROR(f"Could not fetch details for ID {opportunity_id}: {e}"))
-                        # We can still proceed with the summary data
+                        self.stderr.write(self.style.ERROR(f"Could not fetch details for ID {opportunity_id}: {e}. Proceeding with summary data."))
 
                 # --- Step 4: Map and Save the Grant Opportunity ---
-                # Use opportunityId as the unique key for update_or_create to avoid duplicates.
-                # First, we need a field in our model to store this. Let's assume we add `source_id`.
-                # For now, we'll try to match by title and funder as a fallback.
-                
-                # Recommended: Add `source_id` to GrantOpportunity model:
-                # source_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
-                
+                # Prepare the data for the fields in our GrantOpportunity model
                 defaults = {
+                    'funder': funder,
+                    'title': grant_details.get('opportunityTitle', 'No Title Provided'),
                     'description': grant_details.get('description', 'No description provided.'),
                     'min_amount': grant_details.get('awardFloor'),
                     'max_amount': grant_details.get('awardCeiling'),
@@ -110,13 +102,12 @@ class Command(BaseCommand):
                     'source_url': f"https://www.grants.gov/search-results-detail/{opportunity_id}",
                     'is_active': grant_details.get('opportunityStatus') == 'posted',
                     'eligibility_criteria': grant_details.get('eligibility', {}).get('description', ''),
-                    # Add other fields you want to map from the API response
                 }
                 
-                # Create or update the grant object
+                # Create or update the grant object using the unique source_name and source_id
                 grant_obj, created = GrantOpportunity.objects.update_or_create(
-                    title=grant_details['opportunityTitle'],
-                    funder=funder,
+                    source_name='GRANTS_GOV',
+                    source_id=str(opportunity_id),
                     defaults=defaults
                 )
 
@@ -128,7 +119,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"Updated grant: {grant_obj.title}")
 
                 # --- Step 5 (For Future Implementation): Index for RAG ---
-                # Here, after saving, you would call your baserag service to index the text fields.
+                # After saving, you would call your baserag service to index the text.
                 # from baserag.services import index_document
                 # document_text = f"Title: {grant_obj.title}\nDescription: {grant_obj.description}\nEligibility: {grant_obj.eligibility_criteria}"
                 # index_document(document_id=str(grant_obj.id), text=document_text, metadata={'grant_id': str(grant_obj.id), 'funder': funder.name})
