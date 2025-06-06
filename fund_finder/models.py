@@ -13,6 +13,9 @@ class FunderProfile(AuditableModel):
     website = models.URLField(blank=True, null=True)
     funder_type = models.CharField(max_length=50, blank=True, null=True, help_text="e.g., Foundation, Corporate, Government")
     
+    # Add the missing is_active field
+    is_active = models.BooleanField(default=True, help_text="Is this funder profile currently active and visible?")
+    
     def __str__(self):
         return self.name
 
