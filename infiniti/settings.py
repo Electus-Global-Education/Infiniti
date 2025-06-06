@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'edujobs',
     'baserag',
     'fini',
+    'fund_finder',
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
