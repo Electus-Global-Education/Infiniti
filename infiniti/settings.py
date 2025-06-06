@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent # This should point to your pr
 # Define default values and casting for environment variables
 env = environ.Env(
     DEBUG=(bool, False),
-    ALLOWED_HOSTS=(list, ['127.0.0.1', 'localhost']),
+    ALLOWED_HOSTS=(list, ['127.0.0.1', 'localhost',"35.208.164.184"]),
     CSRF_TRUSTED_ORIGINS=(list, ['http://localhost:8000', 'http://127.0.0.1:8000']),
     CORS_ALLOWED_ORIGINS=(list, ['http://localhost:3000', 'http://127.0.0.1:3000']),
     CELERY_BROKER_URL=(str, "redis://redis:6379/0"),

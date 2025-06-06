@@ -228,7 +228,7 @@ class TTSStatusView(APIView):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
-@shared_task(bind=True)
+@shared_task(name="fini.views.generate_tts_task",bind=True)
 def generate_tts_task(self, text: str) -> dict:
     """
     Celery task that takes a text string, sends it to Google TTS,
