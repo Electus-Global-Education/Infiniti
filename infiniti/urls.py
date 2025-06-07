@@ -18,6 +18,10 @@ urlpatterns = [
     path("api/vector/", include("baserag.urls")), # 'baserag' is an app
     path("api/fini/", include("fini.urls")),       # 'fini' is an app
     path("api/", include(('core.urls', 'core_api'), namespace='core_api')), # 'core' is an app with its own urls.py
+
+    # To include all fund_finder API endpoints
+    path('api/fund_finder/', include('fund_finder.urls')),
+    
     
 
     # JWT Token Authentication
