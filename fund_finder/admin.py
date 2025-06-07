@@ -9,15 +9,21 @@ from core.admin import AuditableModelAdmin
 from django.db.models import Q
 import io
 import contextlib
+import zipfile
+import tempfile
+import os
+import shutil
 
 # --- File Upload Form ---
 class DataUploadForm(forms.Form):
-    file = forms.FileField(help_text="Upload a CSV or XML file from Grants.gov.")
+    # Update the form to accept .zip files
+    file = forms.FileField(help_text="Upload a CSV, XML, or a ZIP file containing multiple CSV/XML files.")
 
     def clean_file(self):
         file = self.cleaned_data['file']
-        if not file.name.endswith(('.csv', '.xml')):
-            raise forms.ValidationError("Invalid file type. Please upload a .csv or .xml file.")
+        # Update validation to include .zip
+        if not file.name.endswith(('.csv', '.xml', '.zip')):
+            raise forms.ValidationError("Invalid file type. Please upload a .csv, .xml, or .zip file.")
         return file
 
 
@@ -96,47 +102,69 @@ class GrantOpportunityAdmin(AuditableModelAdmin):
         ]
         return custom_urls + urls
 
+    def _process_file(self, file_path, request):
+        """Helper method to process a single file (CSV or XML)."""
+        output_buffer = io.StringIO()
+        command_to_run = ''
+        filename = os.path.basename(file_path)
+
+        if filename.endswith('.csv'):
+            command_to_run = 'import_grants_from_csv'
+        elif filename.endswith('.xml'):
+            command_to_run = 'import_grants_from_xml'
+        
+        if command_to_run:
+            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
+                call_command(command_to_run, file_path, stdout=output_buffer, stderr=output_buffer)
+            
+            output_str = output_buffer.getvalue()
+            self.message_user(request, f"<pre>Processing Log for: {filename}\n\n{output_str}</pre>", messages.INFO, extra_tags='safe')
+        else:
+            self.message_user(request, f"Skipping unsupported file: {filename}", messages.WARNING)
+
+
     def upload_grants_view(self, request):
         if request.method == 'POST':
             form = DataUploadForm(request.POST, request.FILES)
             if form.is_valid():
                 file = request.FILES['file']
                 
-                # Save the uploaded file temporarily
-                from django.core.files.storage import FileSystemStorage
-                fs = FileSystemStorage()
-                filename = fs.save(file.name, file)
-                uploaded_file_path = fs.path(filename)
+                # --- ZIP file handling logic ---
+                if file.name.endswith('.zip'):
+                    try:
+                        # Use a temporary directory for safe extraction
+                        with tempfile.TemporaryDirectory() as temp_dir:
+                            with zipfile.ZipFile(file, 'r') as zip_ref:
+                                zip_ref.extractall(temp_dir)
+                            
+                            self.message_user(request, f"Successfully extracted '{file.name}'. Processing contents...", messages.SUCCESS)
+                            
+                            # Process each file found in the zip archive
+                            for extracted_filename in sorted(os.listdir(temp_dir)):
+                                full_file_path = os.path.join(temp_dir, extracted_filename)
+                                if os.path.isfile(full_file_path):
+                                    self._process_file(full_file_path, request)
+                                    
+                    except zipfile.BadZipFile:
+                        self.message_user(request, "Error: The uploaded file is not a valid zip file.", messages.ERROR)
+                    except Exception as e:
+                        self.message_user(request, f"An error occurred during zip file processing: {e}", messages.ERROR)
                 
-                # Use a string buffer to capture the output of the management command
-                output_buffer = io.StringIO()
-                
-                try:
-                    command_to_run = ''
-                    if filename.endswith('.csv'):
-                        command_to_run = 'import_grants_from_csv'
-                    elif filename.endswith('.xml'):
-                        command_to_run = 'import_grants_from_xml'
+                # --- Single CSV/XML file handling logic ---
+                else:
+                    from django.core.files.storage import FileSystemStorage
+                    fs = FileSystemStorage()
+                    filename = fs.save(file.name, file)
+                    uploaded_file_path = fs.path(filename)
                     
-                    if command_to_run:
-                        # Redirect stdout and stderr to our buffer to capture all output
-                        with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
-                            call_command(command_to_run, uploaded_file_path, stdout=output_buffer, stderr=output_buffer)
-                        
-                        # Display the command's output as a message in the admin
-                        output_str = output_buffer.getvalue()
-                        # Use preformatted text to preserve newlines and spacing in the message
-                        self.message_user(request, f"<pre>File Processing Log:\n\n{output_str}</pre>", messages.INFO, extra_tags='safe')
-                    else:
-                        self.message_user(request, "Invalid file type. Could not determine which importer to use.", messages.ERROR)
-
-                except Exception as e:
-                    self.message_user(request, f"A critical error occurred while trying to process the file: {e}", messages.ERROR)
-                finally:
-                    # Clean up the temporary file
-                    fs.delete(filename)
+                    try:
+                        self._process_file(uploaded_file_path, request)
+                    except Exception as e:
+                        self.message_user(request, f"A critical error occurred while trying to process the file: {e}", messages.ERROR)
+                    finally:
+                        fs.delete(filename) # Clean up the temporary file
                 
-                return redirect('.') # Redirect back to this same upload page to see the message
+                return redirect('.') # Redirect back to this same upload page to see the messages
         else:
             form = DataUploadForm()
             
