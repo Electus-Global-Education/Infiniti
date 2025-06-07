@@ -45,15 +45,15 @@ class FunderTypeAdmin(AuditableModelAdmin):
 @admin.register(FunderProfile)
 class FunderProfileAdmin(AuditableModelAdmin):
     list_display = ('name', 'funder_type', 'is_active', 'organization_display', 'updated_at')
-    search_fields = ('name', 'description', 'id')
+    search_fields = ('name', 'description', 'id', 'agency_code')
     list_filter = ('is_active', 'funder_type', 'organization__name')
     
     fieldsets = (
         ('Funder Information', {
-            'fields': ('name', 'description', 'website', 'funder_type', 'is_active')
+            'fields': ('name', 'agency_code', 'description', 'website', 'funder_type', 'is_active', 'contact_info')
         }),
         ('Categorization & Scope', {
-            'fields': ('geographic_focus', 'program_areas', 'past_funding_notes', 'organization')
+            'fields': ('geographic_focus', 'program_areas', 'organization')
         }),
         ('Auditing', {
             'fields': AuditableModelAdmin.readonly_fields,
@@ -79,18 +79,24 @@ class FunderProfileAdmin(AuditableModelAdmin):
 
 @admin.register(GrantOpportunity)
 class GrantOpportunityAdmin(AuditableModelAdmin):
-    list_display = ('title', 'funder', 'application_deadline', 'is_active', 'source_name', 'updated_at')
-    search_fields = ('title', 'description', 'funder__name', 'source_id', 'id', 'tags')
-    list_filter = ('is_active', 'source_name', 'funder__name', 'application_deadline')
+    list_display = ('title', 'funder', 'close_date', 'status', 'is_active', 'source_name')
+    search_fields = ('title', 'description', 'funder__name', 'source_id', 'id', 'assistance_listings')
+    list_filter = ('is_active', 'status', 'source_name', 'funder__name', 'close_date')
     list_select_related = ('funder',)
-    date_hierarchy = 'application_deadline'
+    date_hierarchy = 'close_date'
     
     fieldsets = (
         ('Grant Information', {
-            'fields': ('title', 'funder', 'description', 'is_active')
+            'fields': ('title', 'funder', 'description', 'is_active', 'status')
         }),
         ('Funding Details', {
-            'fields': ('min_amount', 'max_amount', 'application_deadline', 'funding_instrument_type', 'funding_activity_category', 'eligibility_criteria_text', 'tags')
+            'fields': ('estimated_total_funding', 'award_floor', 'award_ceiling', 'expected_number_of_awards', 'cost_sharing_requirement')
+        }),
+        ('Categorization', {
+            'fields': ('funding_instrument_type', 'funding_activity_category', 'assistance_listings')
+        }),
+        ('Dates & Version', {
+            'fields': ('posted_date', 'close_date', 'last_updated_date', 'version')
         }),
         ('Source Information', {
             'fields': ('source_name', 'source_id', 'source_url')
