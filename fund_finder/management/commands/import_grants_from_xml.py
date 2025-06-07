@@ -9,9 +9,8 @@ class Command(BaseCommand):
     """
     Management command to import grant opportunities from a Grants.gov XML data extract.
 
-    This command uses a robust parsing method that finds grant records by searching for
-    the 'OpportunityID' tag, making it resilient to changes in the parent XML structure
-    and namespaces.
+    This updated version properly handles the XML namespaces used in the official
+    Grants.gov data extract, ensuring reliable parsing of grant opportunity nodes.
     """
     help = 'Imports grant opportunities from a Grants.gov XML data extract file.'
 
@@ -39,9 +38,8 @@ class Command(BaseCommand):
             
     def _find_namespaced_text(self, node, path, ns_map):
         """Helper to find text in a node with a given namespace map."""
-        if not ns_map:
-            return node.findtext(path)
-        return node.findtext(f"ns:{path}", namespaces=ns_map)
+        # The path should be prefixed with the namespace alias, e.g., 'ns:OpportunityID'
+        return node.findtext(path, namespaces=ns_map)
 
     def handle(self, *args, **options):
         xml_file_path = options['xml_file_path']
@@ -55,20 +53,24 @@ class Command(BaseCommand):
         except ET.ParseError as e:
             raise CommandError(f"Failed to parse XML file: {e}")
 
-        # --- More Robust Namespace and Node Detection ---
-        namespace = ''
-        if '}' in root.tag:
-            namespace = root.tag.split('}')[0][1:]
+        # --- Correct Namespace Handling ---
+        # Extract the namespace from the root tag's name (e.g., '{http://apply.grants.gov/system/OpportunityDetail-V1.0}Opportunities')
+        namespace_match = re.match(r'\{([^}]+)\}', root.tag)
+        if not namespace_match:
+            self.stderr.write(self.style.ERROR("Could not determine XML namespace from the root tag. Aborting."))
+            return
+            
+        namespace = namespace_match.group(1)
+        ns_map = {'ns': namespace}
         
-        ns_map = {'ns': namespace} if namespace else {}
-        opportunity_id_tag = f"{{{namespace}}}OpportunityID" if namespace else "OpportunityID"
+        # Use the registered namespace to find the correct nodes.
+        # Based on the documentation, each grant is an <OpportunitySynopsisDetail_1_0>
+        grant_node_path = f".//ns:OpportunitySynopsisDetail_1_0"
 
-        # Instead of searching for a specific parent node, we iterate through the entire
-        # document and find any node that contains an 'OpportunityID'. This is much more robust.
-        grant_nodes = [node for node in root.iter() if node.find(opportunity_id_tag) is not None]
+        grant_nodes = root.findall(grant_node_path, ns_map)
         
         if not grant_nodes:
-            self.stdout.write(self.style.WARNING("Could not find any nodes containing an 'OpportunityID' tag. The XML file might be empty, structured unexpectedly, or have a different tag for the opportunity ID."))
+            self.stdout.write(self.style.WARNING(f"Could not find any grant opportunity nodes using path '{grant_node_path}' with the detected namespace. The XML structure may have changed."))
             return
 
         self.stdout.write(f"Found {len(grant_nodes)} potential grant opportunities in the XML file. Starting processing...")
@@ -79,46 +81,46 @@ class Command(BaseCommand):
         skipped_count = 0
 
         for grant_node in grant_nodes:
-            # Use a lambda function to simplify finding text within the current node
+            # Use a lambda function to simplify finding text within the current node using the namespace map
             find = lambda path: self._find_namespaced_text(grant_node, path, ns_map)
             
-            opportunity_id = find('OpportunityID')
+            opportunity_id = find('ns:OpportunityID')
 
             try:
                 if not opportunity_id:
                     skipped_count += 1
                     continue
 
-                agency_name = (find('AgencyName') or 'Unknown Government Funder').strip()
+                agency_name = (find('ns:AgencyName') or 'Unknown Government Funder').strip()
                 funder, _ = FunderProfile.objects.get_or_create(
                     name=agency_name,
                     defaults={
                         'funder_type': gov_funder_type,
-                        'agency_code': find('AgencyCode'),
+                        'agency_code': find('ns:AgencyCode'),
                         'organization': None
                     }
                 )
 
                 defaults = {
                     'funder': funder,
-                    'title': find('OpportunityTitle') or 'No Title Provided',
-                    'description': find('Description') or 'No description provided.',
-                    'status': (find('OpportunityStatus') or 'POSTED').upper(),
-                    'version': find('Version'),
-                    'estimated_total_funding': self._clean_decimal(find('EstimatedTotalProgramFunding')),
-                    'award_floor': self._clean_decimal(find('AwardFloor')),
-                    'award_ceiling': self._clean_decimal(find('AwardCeiling')),
-                    'expected_number_of_awards': int(find('NumberOfAwards')) if find('NumberOfAwards') else None,
-                    'cost_sharing_requirement': 'Yes' if find('CostSharingOrMatchingRequirement') == 'Y' else 'No',
-                    'funding_instrument_type': find('FundingInstrumentType'),
-                    'funding_activity_category': find('FundingActivityCategory'),
-                    'assistance_listings': find('CFDANumbers'),
-                    'posted_date': self._clean_date(find('PostDate')),
-                    'close_date': self._clean_date(find('ClosingDate')),
-                    'last_updated_date': self._clean_date(find('LastUpdatedDate')),
-                    'is_active': (find('OpportunityStatus') or '').upper() == 'POSTED',
+                    'title': find('ns:OpportunityTitle') or 'No Title Provided',
+                    'description': find('ns:Description') or 'No description provided.',
+                    'status': (find('ns:OpportunityStatus') or 'POSTED').upper(),
+                    'version': find('ns:Version'),
+                    'estimated_total_funding': self._clean_decimal(find('ns:EstimatedTotalProgramFunding')),
+                    'award_floor': self._clean_decimal(find('ns:AwardFloor')),
+                    'award_ceiling': self._clean_decimal(find('ns:AwardCeiling')),
+                    'expected_number_of_awards': int(find('ns:NumberOfAwards')) if find('ns:NumberOfAwards') else None,
+                    'cost_sharing_requirement': 'Yes' if find('ns:CostSharingOrMatchingRequirement') == 'Y' else 'No',
+                    'funding_instrument_type': find('ns:FundingInstrumentType'),
+                    'funding_activity_category': find('ns:FundingActivityCategory'),
+                    'assistance_listings': find('ns:CFDANumbers'),
+                    'posted_date': self._clean_date(find('ns:PostDate')),
+                    'close_date': self._clean_date(find('ns:ClosingDate')),
+                    'last_updated_date': self._clean_date(find('ns:LastUpdatedDate')),
+                    'is_active': (find('ns:OpportunityStatus') or '').upper() == 'POSTED',
                     'source_url': f"https://www.grants.gov/search-results-detail/{opportunity_id}",
-                    'eligibility_criteria_text': find('EligibilityCriteria'),
+                    'eligibility_criteria_text': find('ns:EligibilityCriteria'),
                 }
 
                 grant_obj, created = GrantOpportunity.objects.update_or_create(
