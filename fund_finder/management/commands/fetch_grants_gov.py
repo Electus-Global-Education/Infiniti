@@ -30,7 +30,7 @@ class Command(BaseCommand):
             '--rows',
             type=int,
             help='The number of grant records to fetch (max per request is typically limited by the API).',
-            default=50
+            default=500
         )
         parser.add_argument(
             '--update-details',

@@ -16,7 +16,7 @@ class FunderType(AuditableModel):
         related_name='funder_types',
         help_text="The organization that created and can use this type. Null for system-level types."
     )
-    is_active = models.BooleanField(default=True, help_text="Is this funder type available for use?") # <-- ADDED THIS FIELD
+    is_active = models.BooleanField(default=True, help_text="Is this funder type available for use?")
     
     def __str__(self):
         if self.organization:
@@ -33,24 +33,21 @@ class FunderType(AuditableModel):
 class FunderProfile(AuditableModel):
     """
     Represents a funding organization (e.g., Ford Foundation, Google.org).
-    Can be system-wide (global) or specific to an organization's view.
     """
     name = models.CharField(max_length=255, unique=True, help_text="Official name of the funding organization.")
+    agency_code = models.CharField(max_length=50, blank=True, null=True, help_text="Agency code, e.g., 'DOL-ETA' from Grants.gov.")
     description = models.TextField(blank=True, null=True, help_text="A brief description of the funder's mission and history.")
     website = models.URLField(blank=True, null=True)
-    
     funder_type = models.ForeignKey(
         FunderType,
-        on_delete=models.PROTECT, # Don't delete a type if it's in use
+        on_delete=models.PROTECT,
         null=True, blank=True,
         related_name='funders'
     )
-    
+    contact_info = models.TextField(blank=True, null=True, help_text="Contact person, phone, or email for the funder.")
     geographic_focus = models.CharField(max_length=255, blank=True, help_text="e.g., National, State of California, Local (Urban)")
     program_areas = models.TextField(blank=True, help_text="Comma-separated list of focus areas (e.g., STEM, Arts, Financial Literacy)")
-    past_funding_notes = models.TextField(blank=True, null=True, help_text="Notes on past funding history or priorities.")
     is_active = models.BooleanField(default=True, help_text="Is this funder profile currently active and visible?")
-    
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
@@ -72,46 +69,44 @@ class GrantOpportunity(AuditableModel):
     """
     Represents a specific grant or funding opportunity from a Funder.
     """
-    SOURCE_CHOICES = [
-        ('GRANTS_GOV', 'Grants.gov'),
-        ('MANUAL', 'Manual Entry'),
-        ('XML_UPLOAD', 'XML Upload'),
-    ]
+    STATUS_CHOICES = [('POSTED', 'Posted'), ('FORECASTED', 'Forecasted'), ('CLOSED', 'Closed'), ('ARCHIVED', 'Archived')]
+    COST_SHARING_CHOICES = [('Yes', 'Yes'), ('No', 'No'), ('Not Specified', 'Not Specified')]
     
-    funder = models.ForeignKey(
-        FunderProfile,
-        on_delete=models.PROTECT,
-        related_name='grant_opportunities',
-        help_text="The funding organization offering this grant."
-    )
-    title = models.CharField(max_length=255, help_text="The official title of the grant.")
-    description = models.TextField(help_text="Detailed description of the grant, its goals, and eligibility criteria.")
+    funder = models.ForeignKey(FunderProfile, on_delete=models.PROTECT, related_name='grant_opportunities')
+    title = models.CharField(max_length=255)
+    description = models.TextField(help_text="Full funding description of the grant.")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='POSTED')
     
     # --- Source Information ---
-    source_name = models.CharField(max_length=50, choices=SOURCE_CHOICES, default='MANUAL', help_text="The original source of this grant data.")
-    source_id = models.CharField(max_length=100, null=True, blank=True, help_text="The unique identifier from the source (e.g., opportunityId from Grants.gov).")
-    source_url = models.URLField(blank=True, null=True, help_text="Direct URL to the grant application or information page.")
+    source_name = models.CharField(max_length=50, default='MANUAL')
+    source_id = models.CharField(max_length=100, null=True, blank=True, help_text="The unique opportunity number/ID from the source.")
+    source_url = models.URLField(blank=True, null=True)
+    version = models.CharField(max_length=50, blank=True, null=True, help_text="Version from the source, e.g., 'Synopsis 1'.")
 
-    # --- Key Details (Improved) ---
-    min_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    max_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    application_deadline = models.DateTimeField(null=True, blank=True)
+    # --- Funding Details (Enhanced) ---
+    estimated_total_funding = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    award_floor = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    award_ceiling = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    expected_number_of_awards = models.PositiveIntegerField(null=True, blank=True)
+    cost_sharing_requirement = models.CharField(max_length=20, choices=COST_SHARING_CHOICES, default='Not Specified')
     
-    funding_instrument_type = models.CharField(max_length=100, blank=True, help_text="e.g., Grant, Cooperative Agreement, Loan.")
-    funding_activity_category = models.CharField(max_length=255, blank=True, help_text="e.g., Education, Health, Community Development.")
+    # --- Category and Type ---
+    funding_instrument_type = models.CharField(max_length=255, blank=True, help_text="e.g., Grant, Cooperative Agreement, Loan.")
+    funding_activity_category = models.CharField(max_length=255, blank=True, help_text="e.g., Employment, Labor and Training.")
+    assistance_listings = models.CharField(max_length=255, blank=True, help_text="Assistance Listing Numbers (formerly CFDA).")
     
-    eligibility_criteria_text = models.TextField(blank=True, null=True, help_text="Specific eligibility requirements for applicants.")
+    # --- Dates ---
+    posted_date = models.DateTimeField(null=True, blank=True)
+    close_date = models.DateTimeField(null=True, blank=True)
+    last_updated_date = models.DateTimeField(null=True, blank=True)
     
-    is_active = models.BooleanField(default=True, help_text="Is this grant currently open for applications?")
+    is_active = models.BooleanField(default=True, help_text="Is this grant opportunity considered active in our system?")
     
-    # Keywords/Tags for better filtering and matching
-    tags = models.TextField(blank=True, help_text="Comma-separated keywords for this grant (e.g., youth, STEM, at-risk).")
-
     def __str__(self):
-        return f"{self.title} ({self.funder.name})"
+        return self.title
 
     class Meta(AuditableModel.Meta):
         verbose_name = "Grant Opportunity"
         verbose_name_plural = "Grant Opportunities"
-        ordering = ['-application_deadline', 'title']
+        ordering = ['-close_date', '-posted_date', 'title']
         unique_together = [['source_name', 'source_id']]
