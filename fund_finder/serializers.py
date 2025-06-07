@@ -3,6 +3,12 @@ from rest_framework import serializers
 from .models import FunderType, FunderProfile, GrantOpportunity
 from core.models import Organization
 
+# --- Generic Error Serializer ---
+class ErrorResponseSerializer(serializers.Serializer):
+    """A generic serializer for representing error messages."""
+    detail = serializers.CharField()
+
+
 # --- Serializers for Read Operations ---
 
 class FunderTypeSerializer(serializers.ModelSerializer):
