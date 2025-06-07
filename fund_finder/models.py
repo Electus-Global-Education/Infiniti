@@ -16,6 +16,7 @@ class FunderType(AuditableModel):
         related_name='funder_types',
         help_text="The organization that created and can use this type. Null for system-level types."
     )
+    is_active = models.BooleanField(default=True, help_text="Is this funder type available for use?") # <-- ADDED THIS FIELD
     
     def __str__(self):
         if self.organization:
@@ -100,7 +101,6 @@ class GrantOpportunity(AuditableModel):
     funding_activity_category = models.CharField(max_length=255, blank=True, help_text="e.g., Education, Health, Community Development.")
     
     eligibility_criteria_text = models.TextField(blank=True, null=True, help_text="Specific eligibility requirements for applicants.")
-    # You could later expand eligibility with ManyToManyFields to specific applicant types
     
     is_active = models.BooleanField(default=True, help_text="Is this grant currently open for applications?")
     
