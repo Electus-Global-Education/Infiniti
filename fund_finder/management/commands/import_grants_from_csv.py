@@ -1,5 +1,6 @@
 # fund_finder/management/commands/import_grants_from_csv.py
 import csv
+import re
 from django.core.management.base import BaseCommand, CommandError
 from django.utils.dateparse import parse_datetime
 from fund_finder.models import FunderProfile, GrantOpportunity, FunderType
@@ -8,38 +9,55 @@ class Command(BaseCommand):
     """
     Imports grant opportunities from a Grants.gov CSV file.
 
-    Maps the CSV columns to the FunderProfile and GrantOpportunity models.
-    Uses the 'OPPORTUNITY NUMBER' from the CSV as a unique source_id.
-
-    Example usage:
-    - python manage.py import_grants_from_csv /path/to/your/Grants-Export.csv
+    This version includes intelligent parsing to extract the opportunity ID
+    from a HYPERLINK formula commonly found in CSV exports.
     """
     help = 'Imports grant opportunities from a Grants.gov CSV data file.'
 
     def add_arguments(self, parser):
         parser.add_argument('csv_file_path', type=str, help='The full path to the CSV data file.')
 
-    def _clean_decimal(self, value):
+    def _extract_opportunity_id(self, hyperlink_string: str) -> str | None:
+        """
+        Parses a HYPERLINK string to extract the numerical opportunity ID.
+        Example input: =HYPERLINK("https://www.grants.gov/search-results-detail/3589399", "...")
+        Returns: "3589399"
+        """
+        if not hyperlink_string or not hyperlink_string.startswith('=HYPERLINK'):
+            return hyperlink_string # Return as-is if it's not a hyperlink formula
+
+        # Use regex to find the sequence of digits in the URL part of the hyperlink
+        match = re.search(r'/(\d+)"', hyperlink_string)
+        if match:
+            return match.group(1) # Return the captured digits
+        
+        # Fallback if regex fails, just in case
+        return None
+
+    def _clean_decimal(self, value: str) -> float | None:
         """Helper to convert string to decimal, returns None if empty or invalid."""
         if value is None or value.strip() == '':
             return None
         try:
-            return float(value)
+            # Remove commas from numbers like "1,000,000"
+            return float(value.replace(',', ''))
         except (ValueError, TypeError):
             return None
 
-    def _clean_date(self, value):
+    def _clean_date(self, value: str) -> str | None:
         """Helper to parse date string, returns None if invalid."""
         if not value:
             return None
-        # Try different formats if needed. Grants.gov often uses "Mon-DD-YYYY HH:MM:SS AM/PM TZ"
-        # For simplicity, we'll try a common parse. A more robust solution might try several formats.
         try:
-            # Example: Jun-06-2025 03:28:33 PM EST
-            # Python's parse_datetime is quite flexible
-            return parse_datetime(value.replace(' EST', ' -0500').replace(' EDT', ' -0400'))
+            # Handle formats like "Jun-06-2025 03:28:33 PM EST"
+            cleaned_value = value.replace(' EST', ' -0500').replace(' EDT', ' -0400')
+            return parse_datetime(cleaned_value)
         except Exception:
-            return None
+            # Try another common format like MM/DD/YYYY
+            try:
+                return parse_datetime(value)
+            except Exception:
+                return None
 
     def handle(self, *args, **options):
         csv_file_path = options['csv_file_path']
@@ -47,19 +65,24 @@ class Command(BaseCommand):
 
         try:
             with open(csv_file_path, mode='r', encoding='utf-8') as csvfile:
+                # Use a different delimiter if your CSV is not comma-separated
                 reader = csv.DictReader(csvfile)
                 
-                # Get or create the system-level "Government" FunderType
                 gov_funder_type, _ = FunderType.objects.get_or_create(name="Government", organization=None)
 
                 created_count = 0
                 updated_count = 0
+                skipped_count = 0
 
                 for row in reader:
                     try:
-                        opportunity_number = row.get('OPPORTUNITY NUMBER')
-                        if not opportunity_number:
-                            self.stderr.write(self.style.WARNING(f"Skipping row with no OPPORTUNITY NUMBER."))
+                        # Use the new helper to parse the opportunity number
+                        opportunity_id_raw = row.get('OPPORTUNITY NUMBER')
+                        opportunity_id = self._extract_opportunity_id(opportunity_id_raw)
+
+                        if not opportunity_id:
+                            self.stderr.write(self.style.WARNING(f"Skipping row with unparsable OPPORTUNITY NUMBER: {opportunity_id_raw}"))
+                            skipped_count += 1
                             continue
 
                         agency_name = row.get('AGENCY NAME', 'Unknown Government Funder').strip()
@@ -90,11 +113,12 @@ class Command(BaseCommand):
                             'close_date': self._clean_date(row.get('CLOSE DATE')),
                             'last_updated_date': self._clean_date(row.get('LAST UPDATED DATE/TIME')),
                             'is_active': row.get('OPPORTUNITY STATUS', '').lower() == 'posted',
+                            'source_url': f"https://www.grants.gov/search-results-detail/{opportunity_id}",
                         }
                         
                         grant_obj, created = GrantOpportunity.objects.update_or_create(
                             source_name='CSV_UPLOAD',
-                            source_id=opportunity_number,
+                            source_id=opportunity_id,
                             defaults=defaults
                         )
 
@@ -102,11 +126,12 @@ class Command(BaseCommand):
                         else: updated_count += 1
                         
                     except Exception as e:
-                        self.stderr.write(self.style.ERROR(f"Error processing row for opp# {opportunity_number}: {e}"))
+                        self.stderr.write(self.style.ERROR(f"Error processing row for opp ID '{opportunity_id}': {e}"))
+                        skipped_count += 1
 
         except FileNotFoundError:
             raise CommandError(f"CSV file not found at: {csv_file_path}")
         except Exception as e:
-            raise CommandError(f"An unexpected error occurred: {e}")
+            raise CommandError(f"An unexpected error occurred while reading the CSV file: {e}")
 
-        self.stdout.write(self.style.SUCCESS(f"CSV Import complete. Created: {created_count}, Updated: {updated_count}"))
+        self.stdout.write(self.style.SUCCESS(f"CSV Import complete. Created: {created_count}, Updated: {updated_count}, Skipped: {skipped_count}"))
