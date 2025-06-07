@@ -7,6 +7,8 @@ from django import forms
 from .models import FunderProfile, GrantOpportunity, FunderType
 from core.admin import AuditableModelAdmin
 from django.db.models import Q
+import io
+import contextlib
 
 # --- File Upload Form ---
 class DataUploadForm(forms.Form):
@@ -100,27 +102,41 @@ class GrantOpportunityAdmin(AuditableModelAdmin):
             if form.is_valid():
                 file = request.FILES['file']
                 
-                # Save the uploaded file temporarily to a secure location
+                # Save the uploaded file temporarily
                 from django.core.files.storage import FileSystemStorage
                 fs = FileSystemStorage()
                 filename = fs.save(file.name, file)
                 uploaded_file_path = fs.path(filename)
                 
+                # Use a string buffer to capture the output of the management command
+                output_buffer = io.StringIO()
+                
                 try:
-                    # Determine which management command to call based on file extension
+                    command_to_run = ''
                     if filename.endswith('.csv'):
-                        call_command('import_grants_from_csv', uploaded_file_path)
+                        command_to_run = 'import_grants_from_csv'
                     elif filename.endswith('.xml'):
-                        call_command('import_grants_from_xml', uploaded_file_path)
+                        command_to_run = 'import_grants_from_xml'
                     
-                    self.message_user(request, f"Successfully processed file: {filename}", messages.SUCCESS)
+                    if command_to_run:
+                        # Redirect stdout and stderr to our buffer to capture all output
+                        with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
+                            call_command(command_to_run, uploaded_file_path, stdout=output_buffer, stderr=output_buffer)
+                        
+                        # Display the command's output as a message in the admin
+                        output_str = output_buffer.getvalue()
+                        # Use preformatted text to preserve newlines and spacing in the message
+                        self.message_user(request, f"<pre>File Processing Log:\n\n{output_str}</pre>", messages.INFO, extra_tags='safe')
+                    else:
+                        self.message_user(request, "Invalid file type. Could not determine which importer to use.", messages.ERROR)
+
                 except Exception as e:
-                    self.message_user(request, f"Error processing file: {e}", messages.ERROR)
+                    self.message_user(request, f"A critical error occurred while trying to process the file: {e}", messages.ERROR)
                 finally:
                     # Clean up the temporary file
                     fs.delete(filename)
                 
-                return redirect('..') # Redirect back to the GrantOpportunity changelist
+                return redirect('.') # Redirect back to this same upload page to see the message
         else:
             form = DataUploadForm()
             
@@ -128,7 +144,7 @@ class GrantOpportunityAdmin(AuditableModelAdmin):
            self.admin_site.each_context(request),
            title="Upload Grant Data",
            form=form,
-           opts=self.model._meta, # Pass model options for breadcrumbs
+           opts=self.model._meta,
         )
         return render(request, "admin/fund_finder/upload_grants.html", context)
 
