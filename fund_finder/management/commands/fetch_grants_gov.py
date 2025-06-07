@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils.dateparse import parse_datetime
 from django.db import IntegrityError
 from fund_finder.grant_sources.grants_gov import GrantsGovAPIClient
-from fund_finder.models import FunderProfile, GrantOpportunity
+from fund_finder.models import FunderProfile, GrantOpportunity, FunderType
 
 class Command(BaseCommand):
     """
@@ -48,7 +48,6 @@ class Command(BaseCommand):
         client = GrantsGovAPIClient()
         
         try:
-            # 1. Search for a list of grants
             grants_data = client.search_posted_grants(keyword=keyword, rows=rows)
         except Exception as e:
             raise CommandError(f"Failed to fetch data from Grants.gov API: {e}")
@@ -56,6 +55,9 @@ class Command(BaseCommand):
         if not grants_data:
             self.stdout.write(self.style.WARNING("No grant opportunities found or API returned empty list."))
             return
+
+        # Get or create the system-level "Government" FunderType to assign to these funders
+        gov_funder_type, _ = FunderType.objects.get_or_create(name="Government", organization=None)
 
         created_count = 0
         updated_count = 0
@@ -67,31 +69,28 @@ class Command(BaseCommand):
                     self.stderr.write(self.style.WARNING(f"Skipping grant with no opportunityId: {grant_summary.get('opportunityTitle')}"))
                     continue
 
-                # --- Step 2: Get or Create the Funder Profile ---
-                agency_name = grant_summary.get('agencyName', 'Unknown Funder').strip()
+                # --- Get or Create the Funder Profile ---
+                agency_name = grant_summary.get('agencyName', 'Unknown Government Funder').strip()
                 funder, _ = FunderProfile.objects.get_or_create(
                     name=agency_name,
-                    defaults={'funder_type': 'Government'}
+                    defaults={'funder_type': gov_funder_type, 'organization': None} # These are global, system-level funders
                 )
 
-                # --- Step 3: Fetch Detailed Info (Optional) ---
-                grant_details = grant_summary # Start with summary data
+                # --- Fetch Detailed Info if requested ---
+                grant_details = grant_summary
                 if fetch_details:
                     try:
                         self.stdout.write(f"Fetching details for ID: {opportunity_id}...")
-                        # The detailed response often has a slightly different structure
                         detailed_response = client.fetch_opportunity_details(opportunity_id)
-                        # The detailed data is often in a 'synopsis' or similar key
                         synopsis = detailed_response.get('synopsis', {})
                         if synopsis:
                              grant_details.update(synopsis) # Merge detailed data into our grant_details dict
                         else:
-                             grant_details.update(detailed_response) # Fallback to merging the whole response
+                             grant_details.update(detailed_response)
                     except Exception as e:
                         self.stderr.write(self.style.ERROR(f"Could not fetch details for ID {opportunity_id}: {e}. Proceeding with summary data."))
 
-                # --- Step 4: Map and Save the Grant Opportunity ---
-                # Prepare the data for the fields in our GrantOpportunity model
+                # --- Map and Save the Grant Opportunity ---
                 defaults = {
                     'funder': funder,
                     'title': grant_details.get('opportunityTitle', 'No Title Provided'),
@@ -101,10 +100,11 @@ class Command(BaseCommand):
                     'application_deadline': parse_datetime(grant_details['closeDate']) if grant_details.get('closeDate') else None,
                     'source_url': f"https://www.grants.gov/search-results-detail/{opportunity_id}",
                     'is_active': grant_details.get('opportunityStatus') == 'posted',
-                    'eligibility_criteria': grant_details.get('eligibility', {}).get('description', ''),
+                    'funding_instrument_type': ", ".join(grant_details.get('fundingInstruments', [])),
+                    'funding_activity_category': ", ".join(grant_details.get('fundingCategories', [])),
+                    'eligibility_criteria_text': grant_details.get('eligibility', {}).get('description', ''),
                 }
                 
-                # Create or update the grant object using the unique source_name and source_id
                 grant_obj, created = GrantOpportunity.objects.update_or_create(
                     source_name='GRANTS_GOV',
                     source_id=str(opportunity_id),
@@ -118,12 +118,6 @@ class Command(BaseCommand):
                     updated_count += 1
                     self.stdout.write(f"Updated grant: {grant_obj.title}")
 
-                # --- Step 5 (For Future Implementation): Index for RAG ---
-                # After saving, you would call your baserag service to index the text.
-                # from baserag.services import index_document
-                # document_text = f"Title: {grant_obj.title}\nDescription: {grant_obj.description}\nEligibility: {grant_obj.eligibility_criteria}"
-                # index_document(document_id=str(grant_obj.id), text=document_text, metadata={'grant_id': str(grant_obj.id), 'funder': funder.name})
-                
             except IntegrityError as e:
                 self.stderr.write(self.style.ERROR(f"Database integrity error for grant '{grant_summary.get('opportunityTitle')}': {e}"))
             except KeyError as e:
