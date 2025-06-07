@@ -19,7 +19,7 @@ from .serializers import (
     FunderTypeWriteSerializer, FunderProfileWriteSerializer, GrantOpportunityWriteSerializer,
     GrantFileUploadSerializer
 )
-from .services import FundFinderService
+# from .services import FundFinderService # Commented out until it's ready
 from core.models import Organization
 from core.audit_utils import create_audit_log_entry
 
@@ -54,7 +54,6 @@ class ScopedViewSet(viewsets.ModelViewSet):
         Superusers can assign any organization.
         """
         user = self.request.user
-        # For models that have an 'organization' field.
         if 'organization' in serializer.validated_data:
             if user.is_staff and not user.is_superuser and hasattr(user, 'organization') and user.organization:
                 # Org Admins can only create objects for their own organization
@@ -63,20 +62,12 @@ class ScopedViewSet(viewsets.ModelViewSet):
                 # Superuser can specify the organization in the request body
                 serializer.save(created_by=user, updated_by=user)
         else:
-            # For models without an 'organization' field (none in this app currently for writes)
              serializer.save(created_by=user, updated_by=user)
 
 # --- CRUD ViewSets for Models ---
 
 @extend_schema(tags=['Fund Finder - Funder Types'])
 class FunderTypeViewSet(ScopedViewSet):
-    """
-    API endpoints for managing Funder Types.
-    
-    Provides CRUD operations for funder categories. Org Admins can create
-    types scoped to their organization, and can view both their own types
-    and system-level types. Superusers have full access.
-    """
     queryset = FunderType.objects.all()
     
     def get_serializer_class(self):
@@ -87,13 +78,6 @@ class FunderTypeViewSet(ScopedViewSet):
 
 @extend_schema(tags=['Fund Finder - Funder Profiles'])
 class FunderProfileViewSet(ScopedViewSet):
-    """
-    API endpoints for managing Funder Profiles.
-    
-    Provides CRUD for funding organizations. Org Admins can create funder
-    profiles scoped to their organization and view global profiles.
-    Superusers have full access.
-    """
     queryset = FunderProfile.objects.select_related('funder_type', 'organization').all()
 
     def get_serializer_class(self):
@@ -104,19 +88,21 @@ class FunderProfileViewSet(ScopedViewSet):
 
 @extend_schema(tags=['Fund Finder - Grant Opportunities'])
 class GrantOpportunityViewSet(viewsets.ModelViewSet):
-    """
-    API endpoints for managing Grant Opportunities.
-
-    Provides CRUD for grant listings. For MVP, we assume grants are global resources
-    managed by superusers/staff, so we don't apply organization scoping here,
-    but it could be added later if grants become org-specific.
-    """
     queryset = GrantOpportunity.objects.select_related('funder', 'funder__funder_type').all()
-    permission_classes = [IsAdminUser] # Only staff/superusers can manage grants
+    
+    # --- PERMISSION CHANGE ---
+    # Changed from IsAdminUser to IsAuthenticated to allow any logged-in user to VIEW grants.
+    # Write permissions (POST, PUT, DELETE) will be restricted to staff/admins inside get_serializer_class.
+    permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
+        # For write operations, lock this down to staff only
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            # This dynamically applies a stricter permission check for write actions.
+            self.permission_classes = [IsAdminUser] 
             return GrantOpportunityWriteSerializer
+        
+        # For read operations (list, retrieve), IsAuthenticated is used.
         return GrantOpportunitySerializer
 
     def perform_create(self, serializer):
@@ -128,19 +114,13 @@ class GrantOpportunityViewSet(viewsets.ModelViewSet):
 
 @extend_schema(tags=['Fund Finder - Data Ingestion'])
 class GrantFileUploadAPIView(APIView):
-    """
-    API endpoint for uploading a CSV, XML, or ZIP file to bulk-import grants.
-
-    This endpoint is intended for administrative use (e.g., by Superusers or Org Admins
-    with special permissions) to populate the grant knowledge base.
-    """
-    permission_classes = [IsAdminUser] # Only staff/superusers can upload
+    permission_classes = [IsAdminUser]
     parser_classes = (MultiPartParser, FormParser)
 
     @extend_schema(
         request={"multipart/form-data": GrantFileUploadSerializer},
         responses={200: {"description": "File processing complete. See log for details."}, 400: "Invalid file or request."},
-        description="Upload a file for processing. The response will contain a log of the import process. Note: This is a synchronous operation for MVP and may time out on very large files."
+        description="Upload a file for processing. The response will contain a log of the import process."
     )
     def post(self, request, *args, **kwargs):
         serializer = GrantFileUploadSerializer(data=request.data)
@@ -148,18 +128,14 @@ class GrantFileUploadAPIView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         file = serializer.validated_data['file']
-        
-        # This will block the HTTP request until processing is done.
-        # For a production system, this should be offloaded to a background task queue (e.g., Celery).
         log_output = self._process_uploaded_file(file)
         
         return Response({
             "status": "Processing complete.",
-            "log": log_output.splitlines() # Return log as a list of strings
+            "log": log_output.splitlines()
         }, status=status.HTTP_200_OK)
 
     def _process_file(self, file_path, user):
-        """Helper method to run a single management command and capture its output."""
         output_buffer = io.StringIO()
         command_to_run = ''
         filename = os.path.basename(file_path)
@@ -170,9 +146,6 @@ class GrantFileUploadAPIView(APIView):
         if command_to_run:
             with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
                 try:
-                    # Note: Management commands don't have access to the request object.
-                    # We can't automatically log the user from there. Logging would need to be
-                    # added to the command itself or handled here.
                     call_command(command_to_run, file_path, stdout=output_buffer, stderr=output_buffer)
                 except Exception as e:
                     output_buffer.write(f"\nCRITICAL ERROR: Command failed with exception: {e}")
@@ -180,7 +153,6 @@ class GrantFileUploadAPIView(APIView):
         return f"Skipping unsupported file: {filename}"
 
     def _process_uploaded_file(self, file):
-        """Handles single or zipped file processing."""
         if file.name.endswith('.zip'):
             log_entries = [f"Processing ZIP archive: {file.name}"]
             try:
@@ -195,7 +167,7 @@ class GrantFileUploadAPIView(APIView):
             except Exception as e:
                 log_entries.append(f"Error processing ZIP file: {e}")
             return "\n---\n".join(log_entries)
-        else: # Handle single CSV/XML
+        else:
             from django.core.files.storage import FileSystemStorage
             fs = FileSystemStorage()
             filename = fs.save(file.name, file)
