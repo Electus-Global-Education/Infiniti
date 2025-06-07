@@ -1,0 +1,28 @@
+{% extends "admin/change_list.html" %}
+{% load i18n static %}
+
+{% comment %}
+  This template overrides the default admin changelist for the GrantOpportunity model.
+  It inherits everything from the default template and adds a custom button
+  to access our file upload view.
+{% endcomment %}
+
+{# templates/admin/fund_finder/grantopportunity/change_list.html #}
+
+
+{% comment %}
+  We override the 'object-tools-items' block, which is where the default
+  "Add..." button is rendered.
+{% endcomment %}
+{% block object-tools-items %}
+  {# Render the default items first (like the "Add grant opportunity" button) #}
+  {{ block.super }}
+  
+  {# Add our custom button next to the default ones #}
+  <li>
+    {% url 'admin:fund_finder_grantopportunity_upload_grants' as upload_url %}
+    <a href="{{ upload_url }}" class="addlink">
+      {% translate 'Upload Grants from File' %}
+    </a>
+  </li>
+{% endblock %}
