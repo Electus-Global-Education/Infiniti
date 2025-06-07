@@ -12,7 +12,8 @@
 <div class="breadcrumbs">
 <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
 &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
-&rsaquo; <a href="{% url opts.app_label|lower|add:'_'|add:opts.model_name|lower|add:'_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+{# This is the corrected line for the link back to the changelist #}
+&rsaquo; <a href="{% url 'admin:'|add:opts.app_label|add:'_'|add:opts.model_name|add:'_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
 &rsaquo; {% translate 'Upload Grant Data' %}
 </div>
 {% endblock %}
