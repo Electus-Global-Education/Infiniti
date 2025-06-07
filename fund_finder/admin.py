@@ -2,17 +2,17 @@
 from django.contrib import admin, messages
 from django.urls import path
 from django.shortcuts import render, redirect
-from django.core.management import call_command
+from django.conf import settings
 from django import forms
-from .models import FunderProfile, GrantOpportunity, FunderType
-from core.admin import AuditableModelAdmin
-from django.db.models import Q
-import io
-import contextlib
 import zipfile
 import tempfile
 import os
-import shutil
+import io
+
+from .models import FunderProfile, GrantOpportunity, FunderType
+from .tasks import process_grant_file_task # Import our new Celery task
+from core.admin import AuditableModelAdmin
+from django.db.models import Q
 
 # --- File Upload Form ---
 class DataUploadForm(forms.Form):
@@ -102,69 +102,58 @@ class GrantOpportunityAdmin(AuditableModelAdmin):
         ]
         return custom_urls + urls
 
-    def _process_file(self, file_path, request):
-        """Helper method to process a single file (CSV or XML)."""
-        output_buffer = io.StringIO()
-        command_to_run = ''
-        filename = os.path.basename(file_path)
-
-        if filename.endswith('.csv'):
-            command_to_run = 'import_grants_from_csv'
-        elif filename.endswith('.xml'):
-            command_to_run = 'import_grants_from_xml'
-        
-        if command_to_run:
-            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
-                call_command(command_to_run, file_path, stdout=output_buffer, stderr=output_buffer)
-            
-            output_str = output_buffer.getvalue()
-            self.message_user(request, f"<pre>Processing Log for: {filename}\n\n{output_str}</pre>", messages.INFO, extra_tags='safe')
-        else:
-            self.message_user(request, f"Skipping unsupported file: {filename}", messages.WARNING)
-
-
     def upload_grants_view(self, request):
+        """
+        Handles the file upload form. Saves the file to a temporary location
+        and dispatches a Celery task to process it asynchronously.
+        """
         if request.method == 'POST':
             form = DataUploadForm(request.POST, request.FILES)
             if form.is_valid():
                 file = request.FILES['file']
                 
-                # --- ZIP file handling logic ---
+                # Use a temporary directory for safe file handling
+                # We save the file here first, then pass its path to Celery.
+                # Celery worker needs access to this path (shared volume).
+                # A simple approach for Docker is to use a subdir in a shared volume like media.
+                from django.core.files.storage import FileSystemStorage
+                temp_upload_dir = os.path.join(settings.MEDIA_ROOT, 'temp_uploads')
+                fs = FileSystemStorage(location=temp_upload_dir)
+                
                 if file.name.endswith('.zip'):
                     try:
-                        # Use a temporary directory for safe extraction
-                        with tempfile.TemporaryDirectory() as temp_dir:
-                            with zipfile.ZipFile(file, 'r') as zip_ref:
-                                zip_ref.extractall(temp_dir)
-                            
-                            self.message_user(request, f"Successfully extracted '{file.name}'. Processing contents...", messages.SUCCESS)
-                            
-                            # Process each file found in the zip archive
-                            for extracted_filename in sorted(os.listdir(temp_dir)):
-                                full_file_path = os.path.join(temp_dir, extracted_filename)
-                                if os.path.isfile(full_file_path):
-                                    self._process_file(full_file_path, request)
-                                    
-                    except zipfile.BadZipFile:
-                        self.message_user(request, "Error: The uploaded file is not a valid zip file.", messages.ERROR)
+                        with zipfile.ZipFile(file, 'r') as zip_ref:
+                            # We extract and save each valid file individually to pass to Celery
+                            extracted_files_count = 0
+                            for filename_in_zip in zip_ref.namelist():
+                                if filename_in_zip.startswith('__') or filename_in_zip.endswith('/'):
+                                    continue
+                                if not (filename_in_zip.endswith('.csv') or filename_in_zip.endswith('.xml')):
+                                    continue
+
+                                file_data = zip_ref.read(filename_in_zip)
+                                # Save the extracted file to our temp location
+                                saved_filename = fs.save(os.path.basename(filename_in_zip), io.BytesIO(file_data))
+                                uploaded_file_path = fs.path(saved_filename)
+                                
+                                # Launch Celery task for each valid file
+                                process_grant_file_task.delay(uploaded_file_path, os.path.basename(filename_in_zip))
+                                extracted_files_count += 1
+
+                        self.message_user(request, f"ZIP file '{file.name}' accepted. {extracted_files_count} file(s) are being processed in the background. Check Celery worker logs for progress.", messages.SUCCESS)
+
                     except Exception as e:
-                        self.message_user(request, f"An error occurred during zip file processing: {e}", messages.ERROR)
+                        self.message_user(request, f"An error occurred during zip file handling: {e}", messages.ERROR)
                 
-                # --- Single CSV/XML file handling logic ---
-                else:
-                    from django.core.files.storage import FileSystemStorage
-                    fs = FileSystemStorage()
-                    filename = fs.save(file.name, file)
-                    uploaded_file_path = fs.path(filename)
+                else: # Handle single CSV/XML
+                    saved_filename = fs.save(file.name, file)
+                    uploaded_file_path = fs.path(saved_filename)
                     
-                    try:
-                        self._process_file(uploaded_file_path, request)
-                    except Exception as e:
-                        self.message_user(request, f"A critical error occurred while trying to process the file: {e}", messages.ERROR)
-                    finally:
-                        fs.delete(filename) # Clean up the temporary file
+                    # Launch the Celery task
+                    process_grant_file_task.delay(uploaded_file_path, file.name)
+                    self.message_user(request, f"File '{file.name}' accepted and is being processed in the background. Check Celery worker logs for progress.", messages.SUCCESS)
                 
-                return redirect('.') # Redirect back to this same upload page to see the messages
+                return redirect('.') # Redirect back to the same upload page
         else:
             form = DataUploadForm()
             
@@ -175,4 +164,3 @@ class GrantOpportunityAdmin(AuditableModelAdmin):
            opts=self.model._meta,
         )
         return render(request, "admin/fund_finder/upload_grants.html", context)
-
