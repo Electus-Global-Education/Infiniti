@@ -7,62 +7,47 @@ from datetime import timedelta
 
 # --- 1. Base Directory and Environment Setup ---
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Initialize django-environ correctly, only once.
-# Define schema and default values for all environment variables.
 env = environ.Env(
     DEBUG=(bool, False),
-    ALLOWED_HOSTS=(list, []), # Default to an empty list
+    ALLOWED_HOSTS=(list, []),
     CSRF_TRUSTED_ORIGINS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
-    CELERY_BROKER_URL=(str, 'redis://redis:6379/0'), # Default for docker-compose
-    CELERY_RESULT_BACKEND=(str, 'redis://redis:6379/0'), # Default for docker-compose
-    GOOGLE_APPLICATION_CREDENTIALS=(str, ''), # Default to empty for build-time safety
+    CELERY_BROKER_URL=(str, 'redis://redis:6379/0'),
+    CELERY_RESULT_BACKEND=(str, 'redis://redis:6379/0'),
+    GOOGLE_APPLICATION_CREDENTIALS=(str, ''),
     SECURE_SSL_REDIRECT=(bool, False),
     SESSION_COOKIE_SECURE=(bool, False),
     CSRF_COOKIE_SECURE=(bool, False),
     SECURE_HSTS_SECONDS=(int, 0)
 )
-
-# Load environment variables from .env.django first, if it exists.
-# This file should contain all primary settings for an environment.
 ENV_FILE_PATH = BASE_DIR / '.env.django'
 if os.path.exists(ENV_FILE_PATH):
-    print(f"INFO: Reading environment variables from: {ENV_FILE_PATH}")
     env.read_env(ENV_FILE_PATH)
-
-# Load any additional, separate .env files if they exist.
-# These are also loaded by docker-compose for runtime. This makes them available for local management commands.
 env_files_to_check = [".env.gemini", ".env.vectorstore"]
 for f_path in env_files_to_check:
     if os.path.exists(BASE_DIR / f_path):
-        print(f"INFO: Reading additional environment variables from: {f_path}")
         env.read_env(os.path.join(BASE_DIR, f_path), overwrite=True)
 
 # --- 2. Core Django Settings ---
-SECRET_KEY = env('SECRET_KEY') # This MUST be in your .env.django
+SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS') # Reads the list directly from your .env file
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 ROOT_URLCONF = 'infiniti.urls'
 WSGI_APPLICATION = 'infiniti.wsgi.application'
 ASGI_APPLICATION = 'infiniti.asgi.application'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'core.User'
 
-
 # --- 3. Production / HTTPS Proxy Settings ---
-# These settings should be enabled in your .env.django when DEBUG=False
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
     SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=True)
     CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=True)
-    # Optional HSTS settings
     SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
     if SECURE_HSTS_SECONDS > 0:
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
         SECURE_HSTS_PRELOAD = True
-
 
 # --- 4. Application Definition ---
 INSTALLED_APPS = [
@@ -73,19 +58,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
-    # 3rd Party Apps
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
     'rest_framework_simplejwt',
-    # Your Apps
     'core.apps.CoreConfig',
-    'fund_finder.apps.FundFinderConfig', # Added missing fund_finder app
+    'fund_finder.apps.FundFinderConfig',
     'edujobs',
     'baserag',
     'fini',
 ]
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -124,12 +106,13 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'mediafiles'
 
 # --- 7. Third-Party App Configurations (DRF, Celery, etc.) ---
-
-# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        # Our custom API Key auth for external applications (like LifeHub) is now the primary method.
         'core.authentication.APIKeyAuthentication',
+        # SessionAuth is kept for admin users to browse the API.
         'rest_framework.authentication.SessionAuthentication',
+        # JWT is kept for individual human users who might log into a future frontend directly.
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
@@ -138,7 +121,6 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-# Simple JWT
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
@@ -146,20 +128,27 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# drf-spectacular
-SPECTACULAR_SETTINGS = {'TITLE': 'Infiniti Project API', 'DESCRIPTION': 'API documentation for the Infiniti project.', 'VERSION': '1.0.0'}
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Infiniti Project API',
+    'DESCRIPTION': 'API documentation for the Infiniti project.',
+    'VERSION': '1.0.0',
+    # Add a custom security scheme definition for our API Key
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+    },
+    'SECURITY': [
+        {'APIKeyAuth': []}, # Refers to the name we give our scheme in the extension
+        {'BearerAuth': []}, # For JWT
+    ],
+}
 
-# CORS
+# --- CORS & CSRF ---
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
-if not DEBUG and 'https://app.lifehubinfiniti.ai' not in CORS_ALLOWED_ORIGINS:
-    CORS_ALLOWED_ORIGINS.append('https://app.lifehubinfiniti.ai')
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
-if not DEBUG and 'https://app.lifehubinfiniti.ai' not in CSRF_TRUSTED_ORIGINS:
-    CSRF_TRUSTED_ORIGINS.append('https://app.lifehubinfiniti.ai')
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
 
-# Celery
-# Correctly reads from environment using the standard variable names
+# --- Celery ---
 CELERY_BROKER_URL = env('CELERY_BROKER_URL')
 CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
 CELERY_ACCEPT_CONTENT = ['json']
@@ -172,17 +161,13 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'core:dashboard'
 LOGOUT_REDIRECT_URL = 'core:landing_page'
 
-# Google Credentials
-# This is set at runtime by docker-compose, but this line ensures os.environ is updated if read from a file.
+# --- Google Credentials ---
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = env("GOOGLE_APPLICATION_CREDENTIALS")
 
 # --- 9. Logging ---
 LOGGING = {
     'version': 1, 'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {'format': '{levelname} {asctime} {module} {message}', 'style': '{'},
-        'simple': {'format': '{levelname} {message}', 'style': '{'},
-    },
+    'formatters': {'verbose': {'format': '{levelname} {asctime} {module} {message}', 'style': '{'}, 'simple': {'format': '{levelname} {message}', 'style': '{'}},
     'handlers': {'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'}},
     'root': {'handlers': ['console'], 'level': 'INFO'},
     'loggers': {
