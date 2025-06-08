@@ -8,6 +8,7 @@ from datetime import timedelta
 # --- 1. Base Directory and Environment Setup ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
+    SECRET_KEY=(str, 'dummy-secret-key-for-build-only-change-in-production'),
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, []),
     CSRF_TRUSTED_ORIGINS=(list, []),
