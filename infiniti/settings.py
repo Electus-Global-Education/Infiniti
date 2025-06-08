@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Define schema and default values for all environment variables.
 env = environ.Env(
     DEBUG=(bool, False),
-    ALLOWED_HOSTS=(list, []),
+    ALLOWED_HOSTS=(list, []), # Default to an empty list
     CSRF_TRUSTED_ORIGINS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     CELERY_BROKER_URL=(str, 'redis://redis:6379/0'), # Default for docker-compose
@@ -32,7 +32,7 @@ if os.path.exists(ENV_FILE_PATH):
     env.read_env(ENV_FILE_PATH)
 
 # Load any additional, separate .env files if they exist.
-# These are also loaded by docker-compose for runtime.
+# These are also loaded by docker-compose for runtime. This makes them available for local management commands.
 env_files_to_check = [".env.gemini", ".env.vectorstore"]
 for f_path in env_files_to_check:
     if os.path.exists(BASE_DIR / f_path):
@@ -80,7 +80,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     # Your Apps
     'core.apps.CoreConfig',
-    'fund_finder.apps.FundFinderConfig',
+    'fund_finder.apps.FundFinderConfig', # Added missing fund_finder app
     'edujobs',
     'baserag',
     'fini',
@@ -159,8 +159,9 @@ if not DEBUG and 'https://app.lifehubinfiniti.ai' not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append('https://app.lifehubinfiniti.ai')
 
 # Celery
+# Correctly reads from environment using the standard variable names
 CELERY_BROKER_URL = env('CELERY_BROKER_URL')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND') # Note: Renamed from your original CELERY_BACKEND_URL
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
