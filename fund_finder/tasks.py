@@ -7,7 +7,7 @@ import os
 def process_grant_file_task(self, file_path: str, original_filename: str):
     """
     A Celery task to process an uploaded grant data file (CSV or XML).
-    This runs asynchronously to avoid blocking the web request.
+    This runs asynchronously in a Celery worker to avoid blocking the web request.
     """
     command_to_run = ''
     if original_filename.endswith('.csv'):
@@ -17,16 +17,15 @@ def process_grant_file_task(self, file_path: str, original_filename: str):
 
     if command_to_run:
         try:
-            print(f"Celery task starting: Running {command_to_run} on {file_path}")
-            # Note: The output of call_command won't be sent back to the user in this async model.
-            # It will appear in the Celery worker's logs.
-            # For more advanced feedback, you would store the result in the database.
+            print(f"CELERY TASK STARTING: Running {command_to_run} on {file_path}")
+            # The output of call_command will now appear in the Celery worker's logs,
+            # not the Django web server's logs.
             call_command(command_to_run, file_path)
-            print(f"Celery task finished successfully for {original_filename}")
+            print(f"CELERY TASK FINISHED SUCCESSFULLY for {original_filename}")
         except Exception as e:
-            print(f"Celery task failed for {original_filename}: {e}")
+            print(f"CELERY TASK FAILED for {original_filename}: {e}")
         finally:
-            # Clean up the temporary file after processing
+            # Clean up the temporary file after processing is complete
             if os.path.exists(file_path):
                 os.remove(file_path)
                 print(f"Cleaned up temporary file: {file_path}")
