@@ -6,6 +6,12 @@ from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+# --- Customizing the Django Admin Panel ---
+admin.site.site_header = "Infiniti Admin Panel"
+admin.site.site_title = "Infiniti Admin Portal"
+admin.site.index_title = "Welcome to the Infiniti Administration"
+# --- End of Customization ---
+
 urlpatterns = [
     # Admin site
     path('admin/', admin.site.urls),
