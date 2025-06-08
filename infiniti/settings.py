@@ -13,16 +13,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent # This should point to your pr
 # Define default values and casting for environment variables
 env = environ.Env(
     DEBUG=(bool, False),
-    ALLOWED_HOSTS=(list, ['127.0.0.1', 'localhost',"35.208.164.184"]),
-    CSRF_TRUSTED_ORIGINS=(list, ['http://localhost:8000', 'http://127.0.0.1:8000']),
-    CORS_ALLOWED_ORIGINS=(list, ['http://localhost:3000', 'http://127.0.0.1:3000']),
+    ALLOWED_HOSTS=(list, [])
     CELERY_BROKER_URL=(str, "redis://redis:6379/0"),
     CELERY_BACKEND_URL=(str, "redis://redis:6379/1"),
-    # Add a default for GOOGLE_APPLICATION_CREDENTIALS for build time.
-    # The runtime value will be set by docker-compose's environment directive.
-    # An empty string should be fine if it's not strictly needed for settings.py to load
-    # or for apps to initialize during collectstatic.
-    GOOGLE_APPLICATION_CREDENTIALS=(str, '')
 )
 
 AUTH_USER_MODEL = 'core.User'
@@ -35,7 +28,7 @@ LOGOUT_REDIRECT_URL = 'core:landing_page'
 # Attempt to read .env.django file from BASE_DIR.
 ENV_FILE_PATH = BASE_DIR / '.env.django'
 if os.path.exists(ENV_FILE_PATH):
-    print(f"INFO: Reading environment variables from: {ENV_FILE_PATH}")
+    # print(f"INFO: Reading environment variables from: {ENV_FILE_PATH}")
     environ.Env.read_env(ENV_FILE_PATH) # Reads into os.environ and django-environ's cache
 
 CELERY_BROKER_URL     = env("CELERY_BROKER_URL")
@@ -50,7 +43,7 @@ env_files_to_check = [
 ]
 for f_path in env_files_to_check:
     if os.path.exists(f_path):
-        print(f"INFO: Reading additional environment variables from: {f_path}")
+        # print(f"INFO: Reading additional environment variables from: {f_path}")
         # Load these into django-environ's cache. If they define GOOGLE_APPLICATION_CREDENTIALS,
         # the env() call later will pick it up.
         env.read_env(f_path, overwrite=True)
@@ -207,12 +200,12 @@ if not DEBUG and 'https://app.lifehubinfiniti.ai' not in CSRF_TRUSTED_ORIGINS: #
 gac_path_from_env = env('GOOGLE_APPLICATION_CREDENTIALS')
 if gac_path_from_env: # If a non-empty path is found (from env var or a loaded .env file)
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = gac_path_from_env
-    print(f"INFO: GOOGLE_APPLICATION_CREDENTIALS set during settings load to: {gac_path_from_env}")
+    # print(f"INFO: GOOGLE_APPLICATION_CREDENTIALS set during settings load to: {gac_path_from_env}")
 else:
     # This means GAC was not in .env.django, .env.gemini, .env.vectorstore, or OS env
     # and defaulted to ''. This is fine for collectstatic if not strictly needed for app imports.
     # The runtime container will get the proper one from docker-compose's environment setting.
-    print("WARNING: GOOGLE_APPLICATION_CREDENTIALS resolved to an empty string during settings load. Relies on runtime injection for actual use.")
+    # print("WARNING: GOOGLE_APPLICATION_CREDENTIALS resolved to an empty string during settings load. Relies on runtime injection for actual use.")
 
 
 LOGGING = {
@@ -252,8 +245,8 @@ LOGGING = {
     },
 }
 
-print(f"--- Django Settings Initialized (settings.py) ---")
+# print(f"--- Django Settings Initialized (settings.py) ---")
 # Add other debug prints if needed, but the GAC one above is key for this issue.
 print(f"DEBUG: {DEBUG}")
-print(f"STATIC_ROOT: {STATIC_ROOT}")
+# print(f"STATIC_ROOT: {STATIC_ROOT}")
 print("--- End of Django Settings Initialization ---")
