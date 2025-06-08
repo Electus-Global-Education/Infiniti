@@ -86,7 +86,18 @@ TEMPLATES = [
     {'BACKEND': 'django.template.backends.django.DjangoTemplates', 'DIRS': [BASE_DIR / 'templates'], 'APP_DIRS': True,
      'OPTIONS': {'context_processors': ['django.template.context_processors.debug', 'django.template.context_processors.request', 'django.contrib.auth.context_processors.auth', 'django.contrib.messages.context_processors.messages']}}
 ]
-DATABASES = {'default': env.db_url('DATABASE_URL')}
+
+# --- Database Configuration ---
+# Provide a dummy default database URL for the build process.
+# This sqlite database will not actually be used, but it allows settings.py to load.
+# At runtime, the real DATABASE_URL from your .env.django will be used.
+DATABASES = {
+    'default': env.db_url(
+        'DATABASE_URL',
+        default='sqlite:////tmp/db.sqlite3'
+    )
+}
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
