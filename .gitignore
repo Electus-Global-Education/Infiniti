@@ -22,6 +22,7 @@ db.sqlite3
 db.sqlite3-journal
 media/ # Usually, user-uploaded media is not versioned, but depends on strategy
 staticfiles/ # Collected static files, should be generated during deployment
+mediafiles/
 
 # Python
 *.py[cod]
