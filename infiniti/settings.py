@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import environ
 from datetime import timedelta
+from django.conf import settings
 
 # --- 1. Base Directory and Environment Setup ---
 BASE_DIR = Path(__file__).resolve().parent.parent
