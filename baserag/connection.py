@@ -3,10 +3,6 @@ import environ
 from vertexai import init as vertexai_init
 from langchain_google_vertexai import VertexAIEmbeddings, VectorSearchVectorStoreDatastore
 
-
-# Set the correct path to your service account JSON file
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "keys", "gen-lang-client-0718000543-6dd42a3caf19.json")
-
 # Load environment variables
 env = environ.Env()
 
@@ -15,6 +11,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 env.read_env(os.path.join(ROOT_DIR, ".env.vectorstore"))
 
 # Now read the environment variables
+GOOGLE_APPLICATION_CREDENTIALS = env("GOOGLE_APPLICATION_CREDENTIALS")
 PROJECT_ID = env("PROJECT_ID")
 REGION = env("REGION")
 INDEX_ID = env("INDEX_ID")
@@ -46,6 +43,6 @@ vector_store = VectorSearchVectorStoreDatastore.from_components(
     index_id=INDEX_ID,
     gcs_bucket_name=BUCKET,
     endpoint_id=ENDPOINT_ID,
-    embedding=embedding_model,
+    embedding=embedding_model, # Text Embedding-005
     stream_update=True
 )
