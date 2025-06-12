@@ -125,7 +125,26 @@ from urllib.parse import urlparse, parse_qs
 
 def extract_video_id(youtube_url: str) -> Optional[str]:
     """
-    Extracts the 11-character YouTube video ID from a URL, ignoring query params.
+    Extracts the 11-character YouTube video ID from a given YouTube URL.
+
+    Supports multiple YouTube URL formats:
+    - Standard watch URLs: https://www.youtube.com/watch?v=VIDEO_ID
+    - Shortened URLs: https://youtu.be/VIDEO_ID
+    - Embed URLs: https://www.youtube.com/embed/VIDEO_ID
+
+    Args:
+        youtube_url (str): The full YouTube URL to extract the video ID from.
+
+    Returns:
+        Optional[str]: The extracted 11-character YouTube video ID if found, else None.
+
+    Examples:
+        >>> extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        'dQw4w9WgXcQ'
+        >>> extract_video_id("https://youtu.be/dQw4w9WgXcQ")
+        'dQw4w9WgXcQ'
+        >>> extract_video_id("https://www.youtube.com/embed/dQw4w9WgXcQ")
+        'dQw4w9WgXcQ'
     """
     parsed = urlparse(youtube_url)
     query = parse_qs(parsed.query)
@@ -166,6 +185,28 @@ def create_semantic_chunks(text: str, chunk_size: int = 1000, chunk_overlap: int
     return splitter.split_text(text)
 
 def fetch_youtube_transcript(video_url: str) -> Optional[str]:
+    """
+    Fetches the transcript of a YouTube video in English (manual or auto-generated).
+
+    Attempts to:
+    - Extract the video ID from the given YouTube URL
+    - Retrieve the transcript list using YouTubeTranscriptApi
+    - Fetch the English transcript if available
+    - Format and return the transcript text
+
+    Args:
+        video_url (str): Full YouTube video URL (e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ)
+
+    Returns:
+        Optional[str]: The full formatted transcript as a single string, or None if unavailable.
+
+    Raises:
+        None directly — logs errors and safely returns None on failure.
+
+    Example:
+        >>> fetch_youtube_transcript("https://youtu.be/dQw4w9WgXcQ")
+        "We're no strangers to love..."
+    """
     video_id = extract_video_id(video_url)
     print(f"[DEBUG] Extracted video ID: {video_id}")
     if not video_id:
@@ -199,6 +240,34 @@ def fetch_youtube_transcript(video_url: str) -> Optional[str]:
 
 @shared_task
 def process_video_chunks_task(video_url: str) -> Dict[str, object]:
+
+    """
+    Celery task to process a YouTube video into semantically meaningful text chunks
+    and store them in a vector database if they are not semantically similar
+    to existing entries.
+
+    Steps:
+    1. Fetch and clean transcript text from a YouTube video.
+    2. Break transcript into semantic chunks.
+    3. Generate embeddings for each chunk.
+    4. Perform similarity search to avoid duplication.
+    5. Store unique chunks into a vector store with metadata.
+
+    Args:
+        video_url (str): The full URL of the YouTube video to process.
+
+    Returns:
+        Dict[str, object]: A dictionary containing:
+            - video_url (str)
+            - inserted_ids (List[str])
+            - skipped (List[Dict])
+            - total_chunks (int)
+            - skipped_count (int)
+            - raw_transcript (Optional[str])
+            - elapsed_time (float)
+            - message (Optional[str])
+    """
+
     start_time = time.perf_counter()
 
     result: Dict[str, object] = {
