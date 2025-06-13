@@ -6,11 +6,20 @@ from functools import lru_cache
 import os
 import environ
 import time
-import base64   
+import base64
+import re 
 from google.cloud import speech
 from google.cloud.speech import RecognitionConfig, RecognitionAudio
 from google.cloud import texttospeech
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding
+from typing import List, Dict, Optional, Tuple
+from docx import Document as DocxDocument
+from PyPDF2 import PdfReader
+from baserag.connection import embedding_model, vector_store
+
+SIMILARITY_THRESHOLD = 0.90
+# ------------------------------------------------
+# Utility functions for the Gemini LLM and Google TTS/STT services
 # # Load environment variables
 # Get the base directory of the project (two levels up from this file)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -286,3 +295,73 @@ def transcribe_audio_response(
         if result.alternatives
     ]
     return " ".join(transcripts)
+
+# ---------------------------------
+# Embedding & Retrieval Utilities
+# ---------------------------------
+
+def generate_query_embedding(query: str) -> Tuple[List[float], str]:
+    """
+    Generate an embedding vector for a given query string.
+    Returns (embedding_vector, cleaned_query).
+    """
+    if not query or not query.strip():
+        raise ValueError("Query cannot be empty.")
+    embedding = embedding_model.embed_documents([query])[0]
+    if not embedding:
+        raise RuntimeError("Embedding generation failed.")
+    return embedding, query.strip()
+
+def retrieve_chunks_by_embedding(
+    embedding: List[float], top_k: int = 5
+) -> Tuple[float, List[Tuple[any, float]]]:
+    """
+    Retrieves top-K similar chunks from the vector store for a given embedding.
+    Returns (elapsed_time, results).
+    """
+    start = time.time()
+    results = vector_store.similarity_search_by_vector_with_score(embedding, k=top_k)
+    return time.time() - start, results
+
+# -----------------------------
+# Text Preprocessing & Chunking
+# -----------------------------
+
+def preprocess_text(text: str) -> str:
+    """
+    Remove excessive newlines, merging blocks into spaces.
+    """
+    text = re.sub(r'\n+', ' ', text)
+    text = re.sub(r'(?<=\w)\n(?=\w)', ' ', text)
+    return text
+
+
+def create_semantic_chunks(
+    text: str, chunk_size: int = 1000, chunk_overlap: int = 100
+) -> List[str]:
+    """
+    Split cleaned text into overlapping semantic chunks.
+    """
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n", "\n", ".", "!", "?", " "],
+    )
+    return splitter.split_text(text)
+
+# -------------------
+# Document Extraction
+# -------------------
+
+def extract_text_from_docx(path: str) -> str:
+    doc = DocxDocument(path)
+    return "\n".join(p.text for p in doc.paragraphs)
+
+
+def extract_text_from_pdf(path: str) -> str:
+    reader = PdfReader(path)
+    texts = []
+    for pg in reader.pages:
+        t = pg.extract_text() or ''
+        texts.append(t)
+    return "\n".join(texts)
