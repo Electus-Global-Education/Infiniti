@@ -8,6 +8,7 @@ import environ
 import time
 import base64   
 from google.cloud import speech
+from google.cloud.speech import RecognitionConfig, RecognitionAudio
 from google.cloud import texttospeech
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding
 # # Load environment variables
@@ -230,3 +231,58 @@ def generate_audio_response(text: str, language: str = "en-US", voice_name: str 
     except Exception as e:
         print(f"[TTS Error] {e}")
         return ""
+
+def transcribe_audio_response(
+    audio_b64: str,
+    language: str = "en-US"
+) -> str:
+    """
+    Converts a base64‐encoded audio blob into text via Google STT.
+    Autodetects common encodings (LINEAR16, MP3, OGG_OPUS, FLAC).
+    Returns the concatenated transcript, or empty string if nothing recognized.
+    """
+    if not audio_b64.strip():
+        return ""
+
+    # Decode the base64 payload
+    audio_content = base64.b64decode(audio_b64)
+
+    # Autodetect common magic bytes
+    if audio_content.startswith(b'ID3') or audio_content[:2] == b'\xFF\xFB':
+        encoding = RecognitionConfig.AudioEncoding.MP3
+    elif audio_content.startswith(b'OggS'):
+        encoding = RecognitionConfig.AudioEncoding.OGG_OPUS
+    elif audio_content[:4] == b'fLaC':
+        encoding = RecognitionConfig.AudioEncoding.FLAC
+    else:
+        # Default to WAV PCM LINEAR16
+        encoding = RecognitionConfig.AudioEncoding.LINEAR16
+
+    audio = RecognitionAudio(content=audio_content)
+    config = RecognitionConfig(
+        encoding=encoding,
+        sample_rate_hertz=RATE,
+        language_code=language,
+        audio_channel_count=CHANNELS,
+    )
+
+    start = time.time()
+    try:
+        response = speech_client.recognize(config=config, audio=audio)
+    except InvalidArgument as e:
+        # e.g. “Specify MP3 encoding…” or sample_rate_mismatch
+        print(f"[STT InvalidArgument] {e}")
+        return ""
+    except Exception as e:
+        print(f"[STT Error] {e}")
+        return ""
+    elapsed = time.time() - start
+    print(f"[STT] Recognized {len(response.results)} segments in {elapsed:.2f}s")
+
+    # Join all top‐alternative transcripts
+    transcripts = [
+        result.alternatives[0].transcript
+        for result in response.results
+        if result.alternatives
+    ]
+    return " ".join(transcripts)

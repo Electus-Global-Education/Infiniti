@@ -3,16 +3,19 @@
 import os
 import time
 import traceback
+import base64
+from typing import Dict, Any
 from uuid import uuid4
 from django.conf import settings
 from django.core.files.storage import default_storage
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from celery.result import AsyncResult
-from core.utils import generate_gemini_response, generate_audio_response
+from core.utils import generate_gemini_response, generate_audio_response, transcribe_audio_response
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding #generate_llm_response_from_chunks
 from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task, process_boclips_video_task, process_document_task
 from celery import shared_task
@@ -246,7 +249,144 @@ def generate_tts_task(self, text: str) -> dict:
         print(f"[generate_tts_task] ERROR: {e}")
         raise Exception(f"TTS task failed: {e}\n{traceback.format_exc()}")
 
+# ----------------------------------------------------------------
+# Celery Task: Full Voice-Query Pipeline
+# ----------------------------------------------------------------
+@shared_task(name="fini.tasks.process_voice_query_task")
+def process_voice_query_task(
+    audio_b64: str,
+    language: str,
+    user_id: str,
+    user_role: str,
+    base_prompt: str,
+    model_name: str,
+    temperature: float,
+    want_audio: bool
+) -> Dict[str, Any]:
+    """
+    1) Transcribe input audio → text;
+    2) Embed and retrieve context;
+    3) Generate LLM response;
+    4) Optionally synthesize output audio;
+    Returns full payload dict.
+    """
+    start_total = time.time()
 
+    # 1) Speech-to-Text
+    transcript = transcribe_audio_response(audio_b64, language)
+    cleaned_query = transcript.strip()
+
+    # 2) Embedding
+    embed_start = time.time()
+    embedding, cleaned = generate_query_embedding(cleaned_query)
+    embed_time = time.time() - embed_start
+
+    # 3) Retrieval
+    chunk_time, chunks = retrieve_chunks_by_embedding(embedding)
+    context_text = "\n".join([doc.page_content for doc, _ in chunks]) if chunks else "No relevant context found."
+    context_instruction = (
+        "Use the context if helpful. If not, rely on general knowledge."
+    )
+
+    # 4) Compose prompt
+    prompt = (
+        f"User ID: {user_id}\n"
+        f"User Role: {user_role}\n"
+        f"Instructions: {base_prompt}\n\n"
+        f"Context Instructions: {context_instruction}\n\n"
+        f"Context:\n{context_text}\n\n"
+        f"User Question: {cleaned_query}"
+    )
+
+    # 5) LLM Generation
+    llm_start = time.time()
+    llm_resp = generate_gemini_response(prompt, model_name, temperature)
+    text_reply = llm_resp.get("response", "[No response]")
+    llm_time = time.time() - llm_start
+
+    # 6) Optional TTS
+    audio_out = None
+    if want_audio:
+        audio_out = generate_audio_response(text_reply)
+
+    total_time = time.time() - start_total
+
+    return {
+        "transcript": cleaned_query,
+        "response": text_reply,
+        "audio_b64": audio_out or "",
+        "meta": {
+            "timing": {
+                "stt_sec": round(embed_start - start_total, 3),
+                "embedding_sec": round(embed_time, 3),
+                "retrieval_sec": round(chunk_time, 3),
+                "llm_sec": round(llm_time, 3),
+                "total_sec": round(total_time, 3),
+            },
+            "model": model_name,
+            "temperature": temperature,
+        }
+    }
+
+# ----------------------------------------------------------------
+# View: Submit Voice Query (accepts base64 or file upload)
+# ----------------------------------------------------------------
+class VoiceQuerySubmitView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, JSONParser]
+
+    def post(self, request):
+        # Determine audio payload: file upload vs base64 field
+        audio_b64 = None
+        if 'audio_file' in request.FILES:
+            audio_file = request.FILES['audio_file']
+            audio_bytes = audio_file.read()
+            audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+        else:
+            audio_b64 = request.data.get("audio_data")
+
+        if not isinstance(audio_b64, str) or not audio_b64:
+            return Response({"error": "Provide 'audio_file' or 'audio_data' (base64)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        language = request.data.get("language", "en-US")
+        user_id = request.data.get("user_id", DEFAULT_USER_ID)
+        user_role = request.data.get("user_role", DEFAULT_ROLE)
+        base_prompt = request.data.get("base_prompt", DEFAULT_BASE_PROMPT)
+        model_name = request.data.get("model_name", DEFAULT_MODEL)
+        temperature = request.data.get("temperature", DEFAULT_TEMPERATURE)
+        want_audio = bool(request.data.get("audio", False))
+
+        task = process_voice_query_task.delay(
+            audio_b64, language,
+            user_id, user_role,
+            base_prompt, model_name,
+            temperature, want_audio
+        )
+        return Response({"message": "Voice query queued.", "task_id": task.id}, status=status.HTTP_202_ACCEPTED)
+
+# ----------------------------------------------------------------
+# View: Check Voice Query Status
+# ----------------------------------------------------------------
+class VoiceQueryStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        task_id = request.data.get("task_id")
+        if not isinstance(task_id, str):
+            return Response({"error": "`task_id` must be a string."}, status=status.HTTP_400_BAD_REQUEST)
+
+        async_res = AsyncResult(task_id)
+        data = {"task_id": task_id, "status": async_res.status}
+
+        if async_res.ready():
+            if async_res.successful():
+                result = async_res.result or {}
+                data.update(result)
+            else:
+                data["error"] = str(async_res.result)
+
+        return Response(data, status=status.HTTP_200_OK)
+    
 class YouTubeTranscriptAPIView(APIView):
     """
     (Unchanged except for ensuring we’ve already used `fetch_youtube_transcript`

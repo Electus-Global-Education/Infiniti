@@ -1,12 +1,14 @@
 from django.urls import path
 from .views import get_query_embedding_view as get_query_embedding
-from .views import retrieve_top_chunks, FiniLLMChatView, TTSStatusView, YouTubeTranscriptAPIView, ProcessVideoChunksAPIView, CheckTaskStatusAPIView, ProcessBoclipsChunksAPIView, CheckBoclipsTaskStatusAPIView, UploadDocumentAPIView, CheckDocumentTaskStatusAPIView
+from .views import retrieve_top_chunks, FiniLLMChatView, TTSStatusView, YouTubeTranscriptAPIView, ProcessVideoChunksAPIView, CheckTaskStatusAPIView, ProcessBoclipsChunksAPIView, CheckBoclipsTaskStatusAPIView, UploadDocumentAPIView, CheckDocumentTaskStatusAPIView, VoiceQuerySubmitView, VoiceQueryStatusView
 
 urlpatterns = [
     path("embedding/", get_query_embedding),
     path("chunks/", retrieve_top_chunks, name="retrieve_top_chunks"),
     path("rag_chat/", FiniLLMChatView.as_view(), name="fini_chat_api"),
     path("tts-status/", TTSStatusView.as_view(), name="tts-status"),
+    path('voice-query/', VoiceQuerySubmitView.as_view(), name='fini-voice-query'),
+    path('voice-query-status/', VoiceQueryStatusView.as_view(), name='fini-voice-query-status'),
     path("get-YTtranscripts/", YouTubeTranscriptAPIView.as_view(), name="get-YTtranscripts"),
     # Enqueue chunking/embedding → returns Celery task IDs for processing:
     path("YTprocess-chunks/", ProcessVideoChunksAPIView.as_view(), name="YTprocess-chunks"),
