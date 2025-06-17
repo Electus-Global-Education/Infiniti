@@ -70,4 +70,4 @@ EXPOSE 8000
 
 # Command to run the application using Gunicorn
 # Adjust --workers based on your server's CPU cores (typically 2-4 workers per core)
-CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "infiniti.wsgi:application"]
+CMD ["gunicorn", "--workers", "8", "--bind", "0.0.0.0:8000", "infiniti.wsgi:application"]

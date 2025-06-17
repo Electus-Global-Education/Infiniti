@@ -9,7 +9,7 @@ import tempfile
 import os
 import io
 
-from .models import FunderProfile, GrantOpportunity, FunderType
+from .models import FunderProfile, GrantOpportunity, FunderType, DataImportLog
 from .tasks import process_grant_file_task # Import our new Celery task
 from core.admin import AuditableModelAdmin
 from django.db.models import Q
@@ -138,6 +138,20 @@ class GrantOpportunityAdmin(AuditableModelAdmin):
                                 
                                 # Launch Celery task for each valid file
                                 process_grant_file_task.delay(uploaded_file_path, os.path.basename(filename_in_zip))
+                                # create log and enqueue with log_id
+                                import_log = DataImportLog.objects.create(
+                                    original_filename=os.path.basename(filename_in_zip),
+                                    status='PENDING'
+                                )
+                                task = process_grant_file_task.delay(
+                                    uploaded_file_path,
+                                    os.path.basename(filename_in_zip),
+                                    str(import_log.id)
+                                )
+                                # update log with task metadata
+                                import_log.task_id = task.id
+                                import_log.status = 'PROCESSING'
+                                import_log.save(update_fields=['task_id', 'status'])
                                 extracted_files_count += 1
 
                         self.message_user(request, f"ZIP file '{file.name}' accepted. {extracted_files_count} file(s) are being processed in the background. Check Celery worker logs for progress.", messages.SUCCESS)
@@ -151,6 +165,21 @@ class GrantOpportunityAdmin(AuditableModelAdmin):
                     
                     # Launch the Celery task
                     process_grant_file_task.delay(uploaded_file_path, file.name)
+                    saved_filename = fs.save(file.name, file)
+                    uploaded_file_path = fs.path(saved_filename)
+                    # create log and enqueue with log_id
+                    import_log = DataImportLog.objects.create(
+                        original_filename=file.name,
+                        status='PENDING'
+                    )
+                    task = process_grant_file_task.delay(
+                        uploaded_file_path,
+                        file.name,
+                        str(import_log.id)
+                    )
+                    import_log.task_id = task.id
+                    import_log.status = 'PROCESSING'
+                    import_log.save(update_fields=['task_id', 'status'])
                     self.message_user(request, f"File '{file.name}' accepted and is being processed in the background. Check Celery worker logs for progress.", messages.SUCCESS)
                 
                 return redirect('.') # Redirect back to the same upload page
