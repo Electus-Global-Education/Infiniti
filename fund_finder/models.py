@@ -3,6 +3,7 @@ from django.db import models
 from core.models import AuditableModel, Organization, User
 import uuid
 
+
 class FunderType(AuditableModel):
     # ... (content remains the same, not shown for brevity)
     name = models.CharField(max_length=100, help_text="Name of the funder type.")
@@ -29,6 +30,20 @@ class FunderProfile(AuditableModel):
         verbose_name = "Funder Profile"; verbose_name_plural = "Funder Profiles"; ordering = ['name']
 
 class GrantOpportunity(AuditableModel):
+    
+    INDEXING_STATUS_CHOICES = [
+        ('PENDING',  'Pending'),
+        ('INDEXING', 'Indexing'),
+        ('SUCCESS',  'Success'),
+        ('FAILED',   'Failed'),
+    ]
+    indexing_status = models.CharField(
+        max_length=10,
+        choices=INDEXING_STATUS_CHOICES,
+        default='PENDING',
+        db_index=True,
+        help_text="Vector-store ingestion status: Pending → Indexing → Success/Failed"
+    )
     STATUS_CHOICES = [('POSTED', 'Posted'), ('FORECASTED', 'Forecasted'), ('CLOSED', 'Closed'), ('ARCHIVED', 'Archived')]
     COST_SHARING_CHOICES = [('Yes', 'Yes'), ('No', 'No'), ('Not Specified', 'Not Specified')]
     

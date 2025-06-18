@@ -3,6 +3,8 @@ import xml.etree.ElementTree as ET
 import re
 from django.core.management.base import BaseCommand, CommandError
 from django.utils.dateparse import parse_datetime
+from datetime import datetime, date
+from django.utils import timezone
 from fund_finder.models import FunderProfile, GrantOpportunity, FunderType
 
 class Command(BaseCommand):
@@ -101,6 +103,23 @@ class Command(BaseCommand):
                     }
                 )
 
+                    # --- compute active/inactive based on local date ---
+                raw_close = find('ns:CloseDate')
+                close_date_str = self._clean_date(raw_close)
+                is_active = False
+                if close_date_str:
+                    try:
+                        close_dt = datetime.strptime(close_date_str, "%Y-%m-%d").date()
+                        today   = timezone.localdate()
+                        is_active = (close_dt >= today)
+                        # DEBUG LOG so you can inspect in your Celery/Django logs:
+                        self.stdout.write(
+                            f"[DEBUG] raw_close={raw_close!r}, clean={close_date_str}, "
+                            f"close_dt={close_dt}, today={today}, is_active={is_active}"
+                        )
+                    except ValueError:
+                        is_active = False        
+            
                 defaults = {
                     'funder': funder,
                     'title': find('ns:OpportunityTitle') or 'No Title Provided',
@@ -116,9 +135,9 @@ class Command(BaseCommand):
                     'funding_activity_category': find('ns:FundingActivityCategory'),
                     'assistance_listings': find('ns:CFDANumbers'),
                     'posted_date': self._clean_date(find('ns:PostDate')),
-                    'close_date': self._clean_date(find('ns:ClosingDate')),
+                    'close_date': self._clean_date(find('ns:CloseDate')),
                     'last_updated_date': self._clean_date(find('ns:LastUpdatedDate')),
-                    'is_active': (find('ns:OpportunityStatus') or '').upper() == 'POSTED',
+                    'is_active': is_active,
                     'source_url': f"https://www.grants.gov/search-results-detail/{opportunity_id}",
                     'eligibility_criteria_text': find('ns:EligibilityCriteria'),
                 }

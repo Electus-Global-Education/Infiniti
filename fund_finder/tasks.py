@@ -2,13 +2,26 @@
 from celery import shared_task
 from django.core.management import call_command
 import os
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from baserag.connection import embedding_model, vector_store
+from .models import GrantOpportunity
 
 @shared_task(bind=True)
-def process_grant_file_task(self, file_path: str, original_filename: str):
+def process_grant_file_task(self, file_path: str, original_filename: str, import_log_id: str = None):
     """
     A Celery task to process an uploaded grant data file (CSV or XML).
     This runs asynchronously to avoid blocking the web request.
     """
+    # if provided, attach the Celery task ID to the import log
+    if import_log_id:
+        from .models import DataImportLog
+        try:
+            log = DataImportLog.objects.get(id=import_log_id)
+            log.task_id = self.request.id
+            log.status = 'PROCESSING'
+            log.save(update_fields=['task_id','status'])
+        except DataImportLog.DoesNotExist:
+            pass
     command_to_run = ''
     if original_filename.endswith('.csv'):
         command_to_run = 'import_grants_from_csv'
@@ -38,47 +51,71 @@ def process_grant_file_task(self, file_path: str, original_filename: str):
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def index_grant_opportunity_task(self, grant_id: str):
     """
-    Asynchronous task to index a single GrantOpportunity into the vector database
-    and update its status in the PostgreSQL database.
+    Async Celery task to chunk, embed, and upsert a single GrantOpportunity
+    into the vector store, then update its indexing_status.
+
+    Retries up to 3 times on errors, with a 60s delay between attempts.
     """
-    from .models import GrantOpportunity
     try:
-        from baserag.services import index_document
-    except ImportError:
-        def index_document(document_id, text, metadata):
-            print(f"DUMMY INDEXING: doc_id '{document_id}'")
-            return True
+        # 1. Mark as INDEXING via update() to avoid post_save signals
+        GrantOpportunity.objects.filter(id=grant_id).update(indexing_status='INDEXING')
+        print(f"[Celery] Grant {grant_id} indexing_status set to INDEXING")
 
-    try:
+        # 2. Fetch the freshly updated object
         grant = GrantOpportunity.objects.get(id=grant_id)
-        # Mark as 'INDEXING' to prevent duplicate processing
-        grant.indexing_status = 'INDEXING'
-        grant.save(update_fields=['indexing_status'])
 
-        # Prepare text and metadata
-        document_text = f"Title: {grant.title}\n\nDescription: {grant.description}\n\nEligibility: {grant.eligibility_criteria_text}"
-        metadata = {
+        # 2. Build the full text and base metadata
+        document_text = (
+            f"Title: {grant.title}\n\n"
+            f"Description: {grant.description}\n\n"
+            f"Eligibility: {grant.eligibility_criteria_text}"
+        )
+        base_meta = {
             'doc_type': 'grant_opportunity',
             'grant_id': str(grant.id),
             'funder_id': str(grant.funder.id),
         }
-        
-        # Call your centralized RAG indexing service
-        success = index_document(document_id=str(grant.id), text=document_text, metadata=metadata)
-        
-        if success:
-            grant.indexing_status = 'SUCCESS'
-            print(f"Successfully indexed grant: {grant.title} (ID: {grant.id})")
-        else:
-            grant.indexing_status = 'FAILED'
-            print(f"Failed to index grant: {grant.title} (ID: {grant.id})")
-        
-        grant.save(update_fields=['indexing_status'])
+
+        # 3. Chunk the document
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=100,
+            separators=["\n\n", "\n", ".", "!", "?", " "],
+        )
+        chunks = splitter.split_text(document_text)
+
+        # 4. Generate embeddings for each chunk
+        embeddings = embedding_model.embed_documents(chunks)
+
+        # 5. Add embeddings into the VertexAI vector store
+        ids       = [f"{grant.id}-{i}" for i in range(len(chunks))]
+        metadatas = [
+            {**base_meta, 'chunk_index': i}
+            for i in range(len(chunks))
+        ]
+        # use add_texts_with_embeddings (or add_texts) rather than upsert
+        vector_store.add_texts_with_embeddings(
+            texts=chunks,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            ids=ids
+        )
+        # confirmation print right after insertion
+        print(f"[Celery] Added {len(chunks)} chunks to vector store for grant {grant_id} chunks added in vector store.")
+        # 6. Mark success
+        # grant.indexing_status = 'SUCCESS'
+        # grant.save(update_fields=['indexing_status'])
+        # print(f"[Celery] Indexed {len(chunks)} chunks for grant {grant.id}")
+        # 6. Mark success without firing post_save
+        GrantOpportunity.objects.filter(id=grant_id).update(indexing_status='SUCCESS')
+        print(f"[Celery] Indexed {len(chunks)} chunks for grant {grant_id}")
 
     except GrantOpportunity.DoesNotExist:
-        print(f"Error: GrantOpportunity with ID {grant_id} not found for indexing.")
+        # Grant was deleted or never existed — nothing to retry
+        print(f"[Celery] GrantOpportunity {grant_id} not found.")
     except Exception as e:
-        # If any error occurs, mark the grant as failed and retry the task
-        GrantOpportunity.objects.filter(id=grant_id).update(indexing_status='FAILED')
-        print(f"An unexpected error occurred during grant indexing for ID {grant_id}: {e}")
-        self.retry(exc=e)
+        # On any other error, mark as FAILED and retry
+        GrantOpportunity.objects.filter(id=grant_id) \
+                                  .update(indexing_status='FAILED')
+        print(f"[Celery] Error indexing grant {grant_id}: {e}")
+        raise self.retry(exc=e)

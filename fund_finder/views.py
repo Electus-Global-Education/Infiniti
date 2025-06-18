@@ -12,7 +12,7 @@ import os
 from django.core.management import call_command
 import io
 import contextlib
-
+from .tasks import index_grant_opportunity_task
 from .models import FunderType, FunderProfile, GrantOpportunity
 from .serializers import (
     FunderTypeSerializer, FunderProfileSerializer, GrantOpportunitySerializer,
@@ -211,3 +211,38 @@ class GrantFileUploadAPIView(APIView):
             finally:
                 fs.delete(filename)
 
+class IngestGrantOpportunitiesAPIView(APIView):
+    """
+    API view to trigger background indexing of all GrantOpportunity records
+    whose indexing_status is not already "SUCCESS".
+
+    POST /api/ingest-grants/
+      - Enqueues a Celery task (index_grant_opportunity_task) for each grant
+        needing indexing.
+      - Returns JSON: {
+            "triggered_count": <int>,
+            "triggered_ids": [<grant_id>, …]
+        }
+
+    Permissions:
+      - IsAuthenticated
+      - IsAdminUser
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        # Find all grants not yet indexed
+        pending = GrantOpportunity.objects.filter(~Q(indexing_status='SUCCESS'))
+
+        triggered_ids = []
+        for grant in pending:
+            index_grant_opportunity_task.delay(str(grant.id))
+            triggered_ids.append(str(grant.id))
+
+        return Response(
+            {
+                'triggered_count': len(triggered_ids),
+                'triggered_ids': triggered_ids,
+            },
+            status=status.HTTP_200_OK
+        )
