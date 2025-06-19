@@ -12,6 +12,7 @@ import os
 from django.core.management import call_command
 import io
 import contextlib
+from fund_finder.retrieval import retrieve_grant_chunks
 from .tasks import index_grant_opportunity_task
 from .models import FunderType, FunderProfile, GrantOpportunity
 from .serializers import (
@@ -244,5 +245,60 @@ class IngestGrantOpportunitiesAPIView(APIView):
                 'triggered_count': len(triggered_ids),
                 'triggered_ids': triggered_ids,
             },
+            status=status.HTTP_200_OK
+        )
+
+
+class RetrieveGrantChunksAPIView(APIView):
+    """
+    POST or GET /api/fund_finder/retrieve-chunks/
+    {
+      "query": "sustainability grants",
+      "k": 10,
+      "grant_ids": ["uuid1","uuid2"],        # optional
+      "funder_ids": ["fundera","funderb"]     # optional
+    }
+
+    Response 200:
+    {
+      "elapsed": 0.123,
+      "results": [
+        {
+          "text": "…chunk content…",
+          "score": 0.87,
+          "metadata": {
+            "doc_type": "grant_opportunity",
+            "grant_id": "uuid1",
+            "funder_id": "fundera",
+            "chunk_index": 3
+          }
+        },
+        …
+      ]
+    }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        q       = request.data.get('query', '').strip()
+        k       = int(request.data.get('k', 5))
+        grant_ids  = request.data.get('grant_ids', None)
+        funder_ids = request.data.get('funder_ids', None)
+
+        if not q:
+            return Response(
+                {"detail": "The 'query' field is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        elapsed, results = retrieve_grant_chunks(
+            query=q,
+            grant_ids=grant_ids,
+            funder_ids=funder_ids,
+            top_k=k
+        )
+
+        return Response(
+            {"elapsed": elapsed, "results": results},
             status=status.HTTP_200_OK
         )

@@ -74,6 +74,10 @@ def index_grant_opportunity_task(self, grant_id: str):
             'doc_type': 'grant_opportunity',
             'grant_id': str(grant.id),
             'funder_id': str(grant.funder.id),
+            'title': grant.title,
+            #'description': grant.description,
+            'eligibility_criteria': grant.eligibility_criteria_text,
+            'funder_name': grant.funder.name,
         }
 
         # 3. Chunk the document
