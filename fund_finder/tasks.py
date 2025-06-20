@@ -68,7 +68,7 @@ def index_grant_opportunity_task(self, grant_id: str):
         document_text = (
             f"Title: {grant.title}\n\n"
             f"Description: {grant.description}\n\n"
-            f"Eligibility: {grant.eligibility_criteria_text}"
+            f"Eligibility: {grant.eligibility_criteria_text}"      
         )
         base_meta = {
             'doc_type': 'grant_opportunity',
@@ -82,11 +82,16 @@ def index_grant_opportunity_task(self, grant_id: str):
 
         # 3. Chunk the document
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
+            chunk_size=1200,
             chunk_overlap=100,
             separators=["\n\n", "\n", ".", "!", "?", " "],
         )
         chunks = splitter.split_text(document_text)
+
+        # 4a. **Print every chunk** so you can see its content
+        for i, chunk in enumerate(chunks):
+            print(f"[Celery] ✅ Chunk {i} created. It contains the following text///////////////////////////////////////////////////:")
+            print(f"{repr(chunk)}\n{'-'*80}")
 
         # 4. Generate embeddings for each chunk
         embeddings = embedding_model.embed_documents(chunks)

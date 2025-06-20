@@ -12,7 +12,7 @@ import os
 from django.core.management import call_command
 import io
 import contextlib
-from fund_finder.retrieval import retrieve_grant_chunks
+from fund_finder.retrieval import retrieve_grant_chunks_grouped
 from .tasks import index_grant_opportunity_task
 from .models import FunderType, FunderProfile, GrantOpportunity
 from .serializers import (
@@ -291,7 +291,7 @@ class RetrieveGrantChunksAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        elapsed, results = retrieve_grant_chunks(
+        elapsed, results = retrieve_grant_chunks_grouped(
             query=q,
             grant_ids=grant_ids,
             funder_ids=funder_ids,
