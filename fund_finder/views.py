@@ -309,12 +309,50 @@ class RetrieveGrantChunksAPIView(APIView):
 
 class GrantRecommendationAPIView(APIView):
     """
-    POST /api/fund_finder/recommend-grants/
-      { "query": "<user keywords or sentence>", "funder_ids": [...], "k": 10 }
-    → [
-         { grant_id, title, snippet, score, metadata },
-         …
-       ]
+    Recommend Relevant Grants Based on a Search Query and return disctanct grant opportunities titles
+
+    Initiates a semantic search and returns a ranked list of grant opportunities that are most relevant to the user's input query.
+
+    **Endpoint:**  
+    `POST /api/fund_finder/recommend-grants/`
+
+    **Description:**  
+    This endpoint allows users to input a natural language query (e.g., a project summary or keyword list) and receive a list of recommended grants.  
+    Results are ranked based on semantic relevance using vector similarity search.
+
+    **Request Body (application/json):**
+    ```json
+    {
+      "query": "string",            // Required. A natural language query or keywords describing the user's funding needs.
+      "k": 10                       // Optional. Number of top recommendations to return (default: 5).
+    }
+    ```
+
+    **Response:**
+    - `200 OK`
+    ```json
+    {
+      "elapsed": 0.123,  // Time in seconds taken to compute the recommendations.
+      "recommendations": [
+        {
+          "grant_id": "string",     // Unique ID of the recommended grant.
+          "title": "string",        // Title of the grant opportunity.
+          "snippet": "string",      // Short summary or highlight of relevance.
+          "score": 0.875,           // Relevance score (typically cosine similarity or similar).
+          "metadata": {...}         // Additional metadata (e.g., funder info, deadlines, etc.).
+        },
+        ...
+      ]
+    }
+    ```
+
+    **Error Responses:**
+    - `400 Bad Request`: If `query` is missing or invalid.
+    - `401 Unauthorized`: If user is not authenticated.
+
+    **Permissions:**  
+    - Requires authentication (`IsAuthenticated`)
+    ```
     """
     permission_classes = [IsAuthenticated]
 
@@ -339,23 +377,46 @@ class GrantRecommendationAPIView(APIView):
 
 class GenerateProposalAsyncAPIView(APIView):
     """
-    POST /api/fund_finder/generate-proposal/
-    Starts a Celery task to build a grant proposal in background.
+    Generate a Grant Proposal (Asynchronous)
 
-    Body:
-    {
-      "grant_title":    "<exact title>",
-      "sample_proposal": "<example text>",
-      "instructions":    "<what to include>",
-      "top_k":           5,
-      "model_name":      "gemini-pro",
-      "temperature":     0.7
-    }
+    Starts a background task (via Celery) to generate a grant proposal based on the provided input.  
+    The task runs asynchronously, and this endpoint returns a `task_id` which can be used to track the status via the `/proposal-status/` endpoint.
 
-    Response 202:
+    **Endpoint:**  
+    `POST /api/fund_finder/generate-proposal/`
+
+    **Description:**  
+    This endpoint allows users to initiate a proposal generation process for a specific grant opportunity.  
+    It uses a generative language model (e.g., Gemini Pro) to create content based on the input parameters and relevant grant context.
+
+    **Request Body (application/json):**
+    ```json
     {
-      "task_id": "<celery task id>"
+      "grant_title": "string",         // Required. Exact title of the grant.
+      "sample_proposal": "string",     // Optional. A sample or previously accepted proposal to guide generation.
+      "instructions": "string",        // Optional. Specific instructions or focus areas for the proposal.
+      "top_k": 5,                      // Optional. Number of top-matching chunks to use for context (default: 5).
+      "model_name": "gemini-pro",      // Optional. LLM name to use for generation (default: "gemini-pro").
+      "temperature": 0.7               // Optional. Sampling temperature for generation (default: 0.7).
     }
+    ```
+
+    **Response:**
+    - `202 Accepted`
+    ```json
+    {
+      "task_id": "string"  // Celery task ID to track the status of generation.
+    }
+    ```
+
+    **Error Responses:**
+    - `400 Bad Request`: If required fields (like `grant_title`) are missing or invalid.
+    - `401 Unauthorized`: If user is not authenticated.
+
+    **Permissions:**  
+    - Requires authentication (`IsAuthenticated`)
+
+    ```
     """
     permission_classes = [IsAuthenticated]
 
@@ -388,15 +449,54 @@ class GenerateProposalAsyncAPIView(APIView):
 
 class ProposalStatusAPIView(APIView):
     """
-    POST /api/fund_finder/proposal-status/
-    {
-      "task_id": "<celery-task-id>"
-    }
+    Check the Status of a Grant Proposal Generation Task
 
-    Checks the status of the background proposal‐generation task and returns:
-      - PENDING / STARTED / RETRY
-      - SUCCESS + the generated proposal
-      - FAILURE + error message
+    This endpoint checks the current status of a Celery background task responsible for generating a grant proposal.
+
+    **Endpoint:**  
+    `POST /api/fund_finder/proposal-status/`
+
+    **Description:**  
+    Clients should provide a valid `task_id` received after initiating a proposal generation via the `generate-proposal` endpoint. This endpoint returns the current execution status of that task, along with the result (the generated proposal) if the task is completed successfully.
+
+    **Request Body (application/json):**
+    ```
+    {
+      "task_id": "string"  # Required. The ID of the Celery task.
+    }
+    ```
+
+    **Possible Response Scenarios:**
+
+    - **Pending / In Progress:**
+      ```
+      {
+        "status": "PENDING" | "STARTED" | "RETRY"
+      }
+      ```
+
+    - **Successful Completion:**
+      ```
+      {
+        "status": "SUCCESS",
+        "proposal": "string"  # The generated proposal content.
+      }
+      ```
+
+    - **Failure:**
+      ```
+      {
+        "status": "FAILURE",
+        "error": "string"  # Error message explaining why the task failed.
+      }
+      ```
+
+    **Status Codes:**
+    - `200 OK` – Task is pending, in progress, or successfully completed.
+    - `400 Bad Request` – Missing or invalid `task_id`.
+    - `500 Internal Server Error` – Task failed during execution.
+
+        ```
     """
     permission_classes = [IsAuthenticated]
 
