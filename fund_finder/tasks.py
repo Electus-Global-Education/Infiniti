@@ -5,7 +5,12 @@ import os
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from baserag.connection import embedding_model, vector_store
 from .models import GrantOpportunity
+from .retrieval import retrieve_grant_chunks
+from core.utils import generate_gemini_response
+import time
+import logging
 
+logger = logging.getLogger(__name__)
 @shared_task(bind=True)
 def process_grant_file_task(self, file_path: str, original_filename: str, import_log_id: str = None):
     """
@@ -127,4 +132,66 @@ def index_grant_opportunity_task(self, grant_id: str):
         GrantOpportunity.objects.filter(id=grant_id) \
                                   .update(indexing_status='FAILED')
         print(f"[Celery] Error indexing grant {grant_id}: {e}")
+        raise self.retry(exc=e)
+    
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def generate_grant_proposal_task(
+    self,
+    grant_title: str,
+    sample_proposal: str,
+    instructions: str,
+    top_k: int,
+    model_name: str,
+    temperature: float
+) -> str:
+    """
+    1. Lookup GrantOpportunity by title.
+    2. Retrieve top-K distinct chunks.
+    3. Build prompt from sample_proposal, chunks, instructions.
+    4. Call Gemini and return the generated proposal text.
+    """
+    try:
+        # 1) Find grant
+        grant = GrantOpportunity.objects.get(title=grant_title)
+
+        # 2) Retrieve top-K chunks for that grant
+        _, chunks = retrieve_grant_chunks(
+            query=grant.title,
+            grant_ids=[str(grant.id)],
+            top_k=top_k
+        )
+
+        # 3) Build context block
+        chunk_texts = [
+            f"Chunk {i+1}:\n{chunk['text']}"
+            for i, chunk in enumerate(chunks)
+        ]
+        context = "\n\n".join(chunk_texts) if chunk_texts else "No context available."
+
+        # 4) Assemble prompt
+        prompt = (
+            f"Sample Proposal:\n{sample_proposal}\n\n"
+            f"Relevant Chunks for “{grant.title}”:\n{context}\n\n"
+            f"User Instructions:\n{instructions}\n\n"
+            "Please draft a full proposal based on the above."
+        )
+
+        # 5) Call the LLM
+        start = time.time()
+        resp = generate_gemini_response(prompt, model_name, temperature)
+        proposal = resp.get("response", "")
+        elapsed = time.time() - start
+
+        print(f"LLM generated proposal for '{grant_title}' in {elapsed:.2f}s")
+        return proposal
+
+    except GrantOpportunity.DoesNotExist:
+        msg = f"No grant found with title '{grant_title}'"
+        logger.error(msg)
+        # Task failure—no retry
+        raise self.replace(exc=ValueError(msg))
+
+    except Exception as e:
+        logger.exception("Error in generate_grant_proposal_task")
+        # retry once
         raise self.retry(exc=e)

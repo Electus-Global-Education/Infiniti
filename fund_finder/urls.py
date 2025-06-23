@@ -7,7 +7,10 @@ from .views import (
     GrantOpportunityViewSet,
     GrantFileUploadAPIView,
     IngestGrantOpportunitiesAPIView,
-    RetrieveGrantChunksAPIView
+    RetrieveGrantChunksAPIView,
+    GrantRecommendationAPIView,
+    GenerateProposalAsyncAPIView,
+    ProposalStatusAPIView,
     # FundFinderMatchAPIView # Add this back when its service is ready
 )
 
@@ -32,7 +35,10 @@ urlpatterns = [
     # Add the custom file upload endpoint
     path('upload-grants/', GrantFileUploadAPIView.as_view(), name='grant-file-upload'),
     path('ingest-grants-vectorstore/', IngestGrantOpportunitiesAPIView.as_view(), name='ingest-grants'),
-    path('retrieve-chunks/',RetrieveGrantChunksAPIView.as_view(),name='retrieve-grant-chunks'
-    ),
+    path('retrieve-chunks/',RetrieveGrantChunksAPIView.as_view(),name='retrieve-grant-chunks'),
+    path("recommend-grants/", GrantRecommendationAPIView.as_view(),name="recommend-grants"),
+    path("generate-proposal/",GenerateProposalAsyncAPIView.as_view(),name="generate-grant-proposal"),
+    path("proposal-status/",ProposalStatusAPIView.as_view(),name="proposal-status"),
+
 
 ]

@@ -11,9 +11,10 @@ import zipfile
 import os
 from django.core.management import call_command
 import io
+from celery.result import AsyncResult
 import contextlib
-from fund_finder.retrieval import retrieve_grant_chunks_grouped
-from .tasks import index_grant_opportunity_task
+from fund_finder.retrieval import retrieve_grant_chunks_grouped, retrieve_distinct_grant_recs
+from .tasks import index_grant_opportunity_task, generate_grant_proposal_task
 from .models import FunderType, FunderProfile, GrantOpportunity
 from .serializers import (
     FunderTypeSerializer, FunderProfileSerializer, GrantOpportunitySerializer,
@@ -21,9 +22,12 @@ from .serializers import (
     GrantFileUploadSerializer, ErrorResponseSerializer
 )
 # from .services import FundFinderService # Commented out until it's ready
+from core.utils import generate_gemini_response
 from core.models import Organization
 from core.audit_utils import create_audit_log_entry
 
+DEFAULT_MODEL       = "gemini-2.5-flash-preview-05-20"
+DEFAULT_TEMPERATURE = 0.5
 # --- Base ViewSet for Multi-Tenancy Logic ---
 
 class ScopedViewSet(viewsets.ModelViewSet):
@@ -301,4 +305,123 @@ class RetrieveGrantChunksAPIView(APIView):
         return Response(
             {"elapsed": elapsed, "results": results},
             status=status.HTTP_200_OK
+        )
+
+class GrantRecommendationAPIView(APIView):
+    """
+    POST /api/fund_finder/recommend-grants/
+      { "query": "<user keywords or sentence>", "funder_ids": [...], "k": 10 }
+    → [
+         { grant_id, title, snippet, score, metadata },
+         …
+       ]
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        q          = request.data.get("query", "").strip()
+        k          = int(request.data.get("k", 5))
+        funder_ids = request.data.get("funder_ids", None)
+
+        if not q:
+            return Response(
+                {"detail": "The 'query' field is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        elapsed, recs = retrieve_distinct_grant_recs(
+            query=q,
+            funder_ids=funder_ids,
+            top_k=k
+        )
+        return Response({"elapsed": elapsed, "recommendations": recs})
+
+
+class GenerateProposalAsyncAPIView(APIView):
+    """
+    POST /api/fund_finder/generate-proposal/
+    Starts a Celery task to build a grant proposal in background.
+
+    Body:
+    {
+      "grant_title":    "<exact title>",
+      "sample_proposal": "<example text>",
+      "instructions":    "<what to include>",
+      "top_k":           5,
+      "model_name":      "gemini-pro",
+      "temperature":     0.7
+    }
+
+    Response 202:
+    {
+      "task_id": "<celery task id>"
+    }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        data            = request.data
+        grant_title     = data.get("grant_title", "").strip()
+        sample_proposal = data.get("sample_proposal", "").strip()
+        instructions    = data.get("instructions", "").strip()
+        top_k           = int(data.get("top_k", 5))
+        model_name      = data.get("model_name", "gemini-pro")
+        temperature     = float(data.get("temperature", 0.7))
+
+        if not grant_title:
+            return Response(
+                {"detail": "The 'grant_title' field is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # enqueue the task
+        task = generate_grant_proposal_task.delay(
+            grant_title,
+            sample_proposal,
+            instructions,
+            top_k,
+            model_name,
+            temperature
+        )
+        return Response({"task_id": task.id}, status=status.HTTP_202_ACCEPTED)
+
+
+class ProposalStatusAPIView(APIView):
+    """
+    POST /api/fund_finder/proposal-status/
+    {
+      "task_id": "<celery-task-id>"
+    }
+
+    Checks the status of the background proposal‐generation task and returns:
+      - PENDING / STARTED / RETRY
+      - SUCCESS + the generated proposal
+      - FAILURE + error message
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        task_id = request.data.get("task_id")
+        if not task_id:
+            return Response(
+                {"detail": "The 'task_id' field is required in the request body."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        async_res = AsyncResult(task_id)
+        state     = async_res.state
+
+        if state in ("PENDING", "STARTED", "RETRY"):
+            return Response({"status": state})
+
+        if state == "SUCCESS":
+            # The task returns the proposal string
+            proposal = async_res.result
+            return Response({"status": state, "proposal": proposal})
+
+        # Anything else is FAILURE
+        error_msg = str(async_res.result)
+        return Response(
+            {"status": state, "error": error_msg},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
