@@ -27,6 +27,7 @@ urlpatterns = [
 
     # To include all fund_finder API endpoints
     path('api/fund_finder/', include('fund_finder.urls')),
+    path('api/impact_analysis/', include('impact_analysis.urls')),
     
     
 

@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'edujobs',
     'baserag',
     'fini',
+    'impact_analysis',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
