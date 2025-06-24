@@ -118,7 +118,14 @@ class Command(BaseCommand):
                             f"close_dt={close_dt}, today={today}, is_active={is_active}"
                         )
                     except ValueError:
-                        is_active = False        
+                        is_active = False
+                if not is_active:
+
+                    self.stdout.write(self.style.WARNING(
+                        f"Skipping inactive grant OpportunityID='{opportunity_id}' (close_date={close_date_str})"
+                    ))
+                    skipped_count += 1
+                    continue  # do not insert/update inactive grants        
             
                 defaults = {
                     'funder': funder,
