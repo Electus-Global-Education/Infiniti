@@ -32,6 +32,38 @@ DEFAULT_BASE_PROMPT = (
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def get_query_embedding_view(request):
+    """
+    Generate an embedding vector for a given natural language query.
+
+This endpoint accepts a textual query and returns a high-dimensional vector (embedding) representation using a preconfigured embedding model. Useful for semantic search, similarity comparison, or input to downstream machine learning tasks.
+
+---
+
+### 🔐 Authentication:
+- Requires authentication via:
+  - `Authorization: Api-Key <your_api_key>`
+  
+
+---
+
+### 📥 Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: `Api-Key <your_api_key>` `
+
+---
+
+### 📦 Request Body (JSON):
+
+- **query** (`str`, required):  
+  A natural language query to be embedded.
+
+#### ✅ Example Request:
+
+```json
+{
+  "query": "What are educational jobs?"
+}
+    """
     query = request.data.get("query", "").strip()
 
     try:
@@ -87,6 +119,65 @@ def retrieve_top_chunks(request):
 
 
 class FiniLLMChatView(APIView):
+    """
+    RAG-based LLM Chat API – generates contextual responses based on user queries, relevant document chunks, and role-based behavior.
+
+This endpoint accepts a user query and optional parameters to guide how the query is handled and answered. The query is embedded, compared to a vector store of documents, and passed into a prompt for a Gemini-based LLM. Optionally, text-to-speech (TTS) can also be generated for the response.
+
+---
+
+### 🔐 Authentication:
+- Requires **API key**:
+  - Header: `Authorization: Api-Key <your_api_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `Api-Key <your_api_key>`
+
+---
+
+### 📦 Request Body (JSON):
+
+#### Required:
+- `user_query` (`string`):  
+  The natural language input/question provided by the user.
+
+#### Optional:
+- `user_id` (`string`, default: `"anonymous_user"`):  
+  A unique identifier for the user. Used for tracking or personalization.
+
+- `user_role` (`string`, default: `"learner"`):  
+  Role context for the user, which may influence tone or content.
+
+- `base_prompt` (`string`, default: `"You are a helpful assistant."`):  
+  Instructions injected into the system prompt for personality or control.
+
+- `model_name` (`string`, default: `"gemini-1.5-flash"`):  
+  Model version to use. Example: `"gemini-2.0-flash"`, `"gemini-pro"`.
+
+- `temperature` (`float`, default: `0.5`):  
+  Controls randomness in output generation (0 = deterministic, 1 = creative).
+
+- `audio` (`boolean`, default: `false`):  
+  If `true`, will trigger text-to-speech (TTS) generation. Returns `tts_task_id`.
+
+---
+
+### ✅ Example Request:
+
+```json
+{
+  "user_query": "Tell me about Lifehub and Infiniti in two lines.",
+  "user_id": "user_123" (optional),
+  "user_role": "student" (optional) default: "learner",
+  "base_prompt": "You are a helpful learning assistant.",
+  "model_name": "gemini-2.0-flash" (optional) default: "gemini-1.5-flash",
+  "temperature": 0.2 (optional) default: 0.5,
+  "audio": false
+}
+    """
     permission_classes = [IsAuthenticated]
 # Handle POST requests
     def post(self, request):
@@ -199,16 +290,40 @@ class TTSStatusView(APIView):
 
     def post(self, request):
         """
-        POST /api/fini/tts-status/
-        Body: { "task_id": "<celery‐task‐id>" }
+         TTS (Text-to-Speech) Task Status Checker
 
-        Returns:
-          {
-            "task_id": "...",
-            "status": "PENDING" | "SUCCESS" | "FAILURE",
-            "audio": "<base64 string>"   # only if status == "SUCCESS"
-            "error": "..."               # only if status == "FAILURE"
-          }
+Checks the status of a background text-to-speech (TTS) generation task initiated earlier via the `rag_chat` endpoint.
+
+If the task has completed successfully, it returns the generated audio in base64 format. If the task failed, it provides an error message. If still processing, returns status only.
+
+---
+
+### 🔐 Authentication:
+- Requires **API Key** in the header:
+  - `Authorization: Api-Key <your_api_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `Api-Key <your_api_key>`
+
+---
+
+### 📦 Request Body (JSON):
+
+#### Required:
+- `task_id` (`string`):  
+  The Celery task ID returned from the TTS generation request.
+
+---
+
+### ✅ Example Request:
+
+```json
+{
+  "task_id": "765ee02e-5906-4cce-bb63-fbafb8d6a0de"
+}
         """
         task_id = request.data.get("task_id")
         if not isinstance(task_id, str):
@@ -332,6 +447,59 @@ def process_voice_query_task(
 # View: Submit Voice Query (accepts base64 or file upload)
 # ----------------------------------------------------------------
 class VoiceQuerySubmitView(APIView):
+    """
+    🎙️ Submit Voice Query for LLM-Based Response
+
+This endpoint accepts either a recorded audio file (via multipart upload) or a base64-encoded audio string, processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task. Returns a `task_id` for tracking.
+
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `multipart/form-data` **or** `application/json`
+- `Authorization`: `api key <your_key>`
+
+---
+
+### 📦 Request Body Options:
+
+You may submit **either**:
+- `audio_file` (file) – preferred for `multipart/form-data`
+- `audio_data` (base64 string) – preferred for `application/json`
+
+#### Additional Optional Parameters:
+| Field         | Type     | Default      | Description |
+|---------------|----------|--------------|-------------|
+| `language`    | string   | `"en-US"`    | Language code for transcription (e.g., `"en-US"`, `"ur-PK"`) |
+| `user_id`     | string   | `"anonymous_user"` | Custom user identifier |
+| `user_role`   | string   | `"learner"`  | Describes the user role for prompt personalization |
+| `base_prompt` | string   | `"You are a helpful assistant."` | Instruction prefix for LLM |
+| `model_name`  | string   | `"gemini-1.5-flash"` | LLM model to use |
+| `temperature` | float    | `0.5`        | Randomness of response (0 = deterministic, 1 = creative) |
+| `audio`       | boolean  | `false`      | Whether to return synthesized voice response |
+
+---
+
+### ✅ Example Request (multipart/form-data):
+
+```http
+POST /api/fini/voice-query/
+Authorization: Bearer <your_token>
+Content-Type: multipart/form-data
+
+Form-data:
+- audio_file: voice_sample.mp3
+- language: en-US
+- user_id: user_001
+- user_role: student
+- model_name: gemini-2.0-pro
+- temperature: 0.3
+    """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, JSONParser]
 
@@ -368,6 +536,33 @@ class VoiceQuerySubmitView(APIView):
 # View: Check Voice Query Status
 # ----------------------------------------------------------------
 class VoiceQueryStatusView(APIView):
+    """
+    📊 Get Status and Result of a Voice Query Task
+
+This endpoint allows you to check the status and result of a voice query submitted earlier using the `/voice-query/` endpoint.  
+It returns the current task state and, if completed, includes the transcribed text, generated response, and (optionally) the TTS task ID.
+
+---
+
+### 🔐 Authentication:
+- Requires **API Key**:
+  - Header: `Authorization: Api-Key <your_api_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `Api-Key <your_api_key>`
+
+---
+
+### 📦 Request Body:
+
+```json
+{
+  "task_id": "166fc44e-20d6-48ee-a224-483f7101896c"
+}
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -389,8 +584,38 @@ class VoiceQueryStatusView(APIView):
     
 class YouTubeTranscriptAPIView(APIView):
     """
-    (Unchanged except for ensuring we’ve already used `fetch_youtube_transcript`
-     + `preprocess_text` as before.)
+    Fetch and clean YouTube video transcripts from a list of video URLs.
+
+This endpoint accepts a list of YouTube video URLs, retrieves their transcripts (if available), preprocesses the text for downstream use (e.g. chunking or embedding), and returns both raw and cleaned transcripts. It also measures and returns timing metrics per video.
+
+---
+
+### 🔐 Authentication:
+- Requires API key authentication only:
+  - `Authorization: Api-Key <your_api_key>`
+
+---
+
+### 📥 Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: `Api-Key <your_api_key>`
+
+---
+
+### 📦 Request Body (JSON):
+
+- **urls** (`list[str]`, required):  
+  A list of valid YouTube video URLs to process.
+
+#### ✅ Example Request:
+
+```json
+{
+  "urls": [
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://youtu.be/2vjPBrBU-TM"
+  ]
+}
     """
     permission_classes = [IsAuthenticated]
 
@@ -442,15 +667,35 @@ class YouTubeTranscriptAPIView(APIView):
 
 class ProcessVideoChunksAPIView(APIView):
     """
-    Accepts a POST with JSON body: { "urls": [ "<youtube_url1>", "<youtube_url2>", ... ] }.
-    Requires authentication.
+Process a list of YouTube video URLs by queuing background tasks to extract, chunk, embed, and analyze content.
 
-    For each URL:
-      - We enqueue a Celery task (`process_video_chunks_task.delay(video_url)`).
-      - Return immediately a JSON mapping of { url: <celery_task_id> }.
+This endpoint accepts a list of YouTube video URLs and asynchronously queues a background task (via Celery) for each URL. These tasks handle video content chunking, embedding, and semantic processing (e.g., similarity checks). This is typically used for educational or knowledge-indexing pipelines.
 
-    The Celery worker(s) will process each URL one by one in the background,
-    performing chunking → embedding → similarity check → insertion.
+### 🔐 Authentication:
+- Requires API key authentication (`Authorization: Api-Key <your_api_key>`)
+
+---
+
+### 📥 Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: `Api-Key <your_api_key>`
+
+---
+
+### 📦 Request Body (JSON):
+
+- **urls** (`list[str]`, required):  
+  A list of valid YouTube video URLs to be processed.
+
+#### ✅ Example:
+
+```json
+{
+  "urls": [
+    "https://youtu.be/aa528jbZDeI?si=fIONn5nt3xsKV45Q",
+    "https://youtu.be/yadfklLi9tk?si=Pz7aPUxr2KLGf0nG"
+  ]
+}
     """
 
     permission_classes = [IsAuthenticated]
@@ -487,9 +732,34 @@ class ProcessVideoChunksAPIView(APIView):
 
 class CheckTaskStatusAPIView(APIView):
     """
-    (Optional helper endpoint)
-    Given a POST with { "task_id": "<celery_task_id>" }, returns the task state
-    and (if finished) the result dictionary from `process_video_chunks_task`.
+    Check the status of a previously submitted video processing task.
+
+This endpoint allows clients to check the current status of a background Celery task that was submitted using the `/api/fini/YTprocess-chunks/` endpoint. It returns the task status (e.g., `PENDING`, `STARTED`, `SUCCESS`, `FAILURE`) and includes the result if the task has finished.
+
+---
+
+### 🔐 Authentication:
+- Requires API key authentication (`Authorization: Api-Key <your_api_key>`)
+
+---
+
+### 📥 Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: `Api-Key <your_api_key>`
+
+---
+
+### 📦 Request Body (JSON):
+
+- **task_id** (`str`, required):  
+  The Celery task ID returned when the task was first enqueued.
+
+#### ✅ Example Request:
+
+```json
+{
+  "task_id": "fe9b0576-01b7-4878-9174-187eb9acb8f1"
+}
     """
 
     permission_classes = [IsAuthenticated]
@@ -526,9 +796,40 @@ class CheckTaskStatusAPIView(APIView):
 
 class ProcessBoclipsChunksAPIView(APIView):
     """
-    POST { "video_ids": ["id1", "id2", ... ] }
-    Requires authentication. Enqueues a separate Celery task per Boclips video ID.
-    Responds with { video_id: task_id, ... } and 202 Accepted.
+    Enqueue background tasks to process Boclips videos by video ID.
+
+This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, queues a background Celery task to fetch the transcript (if any), chunk the content, and generate embeddings. It returns a map of input video IDs to their respective Celery task IDs.
+
+---
+
+### 🔐 Authentication:
+- Requires API key authentication via:
+  - `Authorization: Api-Key <your_api_key>`
+  
+
+---
+
+### 📥 Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**:  
+  `Api-Key <your_api_key>` 
+
+---
+
+### 📦 Request Body (JSON):
+
+- **video_ids** (`list[str]`, required):  
+  A list of Boclips video URLs or IDs to process.
+
+#### ✅ Example Request:
+
+```json
+{
+  "video_ids": [
+    "https://classroom.boclips.com/videos/shared/6080431a52688a3fcaf2ed26?referer=cf55155d-5f68-419c-97bd-c4298e8dea72&segmentEnd=60",
+    "https://classroom.boclips.com/videos/shared/6432cf562154dd5afd5f4854?referer=cf55155d-5f68-419c-97bd-c4298e8dea72&segmentEnd=275"
+  ]
+}
     """
 
     permission_classes = [IsAuthenticated]
@@ -564,8 +865,34 @@ class ProcessBoclipsChunksAPIView(APIView):
 
 class CheckBoclipsTaskStatusAPIView(APIView):
     """
-    POST { "task_id": "<celery_task_id>" }
-    Returns { task_id, status, (result|error) } for a Boclips task.
+    Check the status of a Boclips video processing task submitted to Celery.
+
+This endpoint allows clients to query the current status of an asynchronous Celery task related to Boclips content processing. It returns the task's status and, if completed, includes the result or any error that occurred during processing.
+
+---
+
+### 🔐 Authentication:
+- Requires API key authentication (`Authorization: Api-Key <your_api_key>`)
+
+---
+
+### 📥 Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: `Api-Key <your_api_key>`
+
+---
+
+### 📦 Request Body (JSON):
+
+- **task_id** (`str`, required):  
+  The Celery task ID you received when the Boclips task was submitted.
+
+#### ✅ Example Request:
+
+```json
+{
+  "task_id": "04c2a931-a070-46f6-a42d-b9544d6b8354"
+}
     """
 
     permission_classes = [IsAuthenticated]
@@ -601,14 +928,37 @@ class UploadDocumentAPIView(APIView):
 
     def post(self, request, *args, **kwargs):
         """
-        Expects a multipart/form-data POST with a single file under "document":
-          - document: (file.obj, content_type either application/pdf or application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+        📄 Upload Document for Background Processing (Embedding + Chunking)
 
-        Returns:
-          {
-            "message": "Enqueued document for processing.",
-            "task_id": "<celery-task-id>"
-          }
+This endpoint accepts a `.pdf` or `.docx` document upload via `multipart/form-data`. Once the file is validated and saved, a Celery task is triggered to process the document (e.g., split it into text chunks and embed them). A task ID is returned for tracking progress.
+
+---
+
+### 🔐 Authentication:
+- Requires **Bearer Token**:
+  - Header: `Authorization: Bearer <api key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `multipart/form-data`
+- `Authorization`: `Api key <asdasd****>`
+
+---
+
+### 📦 Request Body (form-data):
+
+- `document` (**file**, required):  
+  The `.pdf` or `.docx` file to upload and process. Only these two formats are supported.
+
+---
+
+### ✅ Example (cURL Upload):
+
+```bash
+curl -X POST http://localhost:8000/api/fini/upload-document/ \
+  -H "Authorization: api key <your_token>" \
+  -F "document=@/path/to/your_file.pdf"
         """
         # 1) Validate file presence
         uploaded_file = request.FILES.get("document")
@@ -653,21 +1003,43 @@ class UploadDocumentAPIView(APIView):
             status=status.HTTP_202_ACCEPTED,
         )
 
-# fini/views.py  (append after UploadDocumentAPIView)
+
 
 class CheckDocumentTaskStatusAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         """
-        Expects JSON body: { "task_id": "<celery-task-id>" }
+        Check the status of a background document processing task.
 
-        Returns:
-          {
-            "task_id": "<celery-task-id>",
-            "status": "<PENDING|SUCCESS|FAILURE>",
-            "result": { …same dict returned by process_document_task… }  # only if ready
-          }
+This endpoint allows you to track the status of a Celery task submitted for document processing (e.g., parsing, chunking, embedding). It returns the current task state and, if completed, includes the result or error.
+
+---
+
+### 🔐 Authentication:
+- Requires authentication via either:
+  - **Authorization: Api-Key <your_api_key>**
+
+---
+
+### 📥 Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: One of:
+  - `Api-Key your_api_key`
+
+---
+
+### 📦 Request Body (JSON):
+
+- **task_id** (`str`, required):  
+  The ID of the Celery task previously submitted to process a document.
+
+#### ✅ Example:
+
+```json
+{
+  "task_id": "1707570c-5241-42f5-926f-e01d5d7c2c70"
+}
         """
         data = request.data
         task_id = data.get("task_id")
