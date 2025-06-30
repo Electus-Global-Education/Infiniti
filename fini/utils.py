@@ -443,6 +443,35 @@ def _extract_boclips_id(video_ref: str) -> str:
     except Exception as e:
         print(f"[extract_boclips_id] exception parsing, returning original: {video_ref}  (error: {e})")
         return video_ref
+def get_boclips_title(video_ref: str) -> Optional[str]:
+    """
+    1) Normalize video_ref to bare ID.
+    2) Fetch metadata via get_boclips_metadata().
+    3) If metadata is present, return metadata['title'] (or fallback
+       to another plausible key), else return None.
+    """
+    # 1) Normalize and log
+    video_id = _extract_boclips_id(video_ref)
+    print(f"[get_boclips_title] using video_id = {video_id}")
+
+    # 2) Get full metadata
+    try:
+        metadata: Optional[Dict] = get_boclips_metadata(video_ref)
+    except Exception as e:
+        print(f"[get_boclips_title] error fetching metadata for {video_id}: {e}")
+        return None
+
+    if not metadata:
+        print(f"[get_boclips_title] no metadata found for {video_id}")
+        return None
+
+    # 3) Extract title field (API typically returns "title")
+    title = metadata.get("title") or metadata.get("name")
+    if title:
+        print(f"[get_boclips_title] fetched title: {title}")
+    else:
+        print(f"[get_boclips_title] metadata has no 'title' or 'name' field for {video_id}")
+    return title
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -559,8 +588,11 @@ def process_boclips_video_task(video_ref: str) -> Dict[str, object]:
     5) Preprocess → chunk → embed → dedupe → insert in vector_store.
     6) Return metadata + embedding results.
     """
+    # 1) Fetch title up-front
+    title: Optional[str] = get_boclips_title(video_ref)
     start_time = time.perf_counter()
     result: Dict[str, object] = {
+        "title": title,
         "video_id": None,
         "title": None,
         "description": None,
@@ -651,11 +683,15 @@ def process_boclips_video_task(video_ref: str) -> Dict[str, object]:
         new_id = f"{prefix}{next_index}"
         next_index += 1
         metadata_entry = {
+            "title": title,
             "text": chunk_text,
             "chunk_text": chunk_text,
             "chunk_index": i,
             "source_video": f"boclips:{video_id}",
         }
+        print("Metadata:")
+        for key, value in metadata_entry.items():
+            print(f"{key}: {value}")
         vector_store.add_texts([chunk_text], metadatas=[metadata_entry], ids=[new_id])
         result["inserted_ids"].append(new_id)
 
