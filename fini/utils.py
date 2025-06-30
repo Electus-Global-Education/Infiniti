@@ -384,6 +384,7 @@ def process_video_chunks_task(video_url: str) -> Dict[str, object]:
 
         metadata = {
             "title": title, 
+            "edujob_title": title,
             "text": chunk_text,
             "chunk_text": chunk_text,
             "chunk_index": i,
@@ -443,6 +444,7 @@ def _extract_boclips_id(video_ref: str) -> str:
     except Exception as e:
         print(f"[extract_boclips_id] exception parsing, returning original: {video_ref}  (error: {e})")
         return video_ref
+    
 def get_boclips_title(video_ref: str) -> Optional[str]:
     """
     1) Normalize video_ref to bare ID.
@@ -684,6 +686,7 @@ def process_boclips_video_task(video_ref: str) -> Dict[str, object]:
         next_index += 1
         metadata_entry = {
             "title": title,
+            "edujob_title": title,
             "text": chunk_text,
             "chunk_text": chunk_text,
             "chunk_index": i,
@@ -825,6 +828,7 @@ def process_document_task(file_path: str, original_filename: str) -> Dict[str, o
 
             metadata = {
                 "title": original_filename,
+                "edujob_title": original_filename,
                 "text": chunk_text,
                 "chunk_text": chunk_text,
                 "chunk_index": i,

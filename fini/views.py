@@ -19,6 +19,7 @@ from core.utils import generate_gemini_response, generate_audio_response, transc
 from fini.utils import generate_query_embedding, retrieve_chunks_by_embedding #generate_llm_response_from_chunks
 from .utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task, process_boclips_video_task, process_document_task
 from celery import shared_task
+from fini.edujob_rec import retrieve_distinct_edujob_chunks, retrieve_by_keywords
 
 # Default fallback values
 DEFAULT_ROLE = "Student"
@@ -1060,7 +1061,103 @@ This endpoint allows you to track the status of a Celery task submitted for docu
 
         return Response(response_data, status=status.HTTP_200_OK)
 
+class EdujobRecommendationAPIView(APIView):
+    """
+    Recommend Relevant Edujob Chunks Based on a Search Query and return top-k distinct chunks.
 
+    **Endpoint:**  
+    `POST /api/edujobs/recommend-chunks/`
+
+    **Description:**  
+    Accepts a natural language query and returns the most semantically similar chunks
+    from your Edujobs corpus, ensuring distinctness by the `edujob_title` metadata field.
+
+    **Request Body (application/json):**
+    ```json
+    {
+      "query": "string",   // Required: text to search against the Edujobs chunks.
+      "k": 10              // Optional: number of top chunks to return (default: 10).
+    }
+    
+    OR
+    {
+      "keywords": ["seven wonders","gravity"],
+      "k": 8
+    }
+    ```
+
+    **Response 200 OK:**
+    ```json
+    {
+      "elapsed": 0.123,      // Time in seconds taken to compute recommendations.
+      "recommendations": [
+        {
+          "chunk_id": "string",          // Unique ID of this chunk.
+          "edujob_title": "string",      // The title under which this chunk was stored.
+          "snippet": "string",           // A short excerpt of the chunk text.
+          "score": 0.95,                 // Similarity score.
+          "metadata": { … }              // Any other metadata you attached.
+        },
+        …
+      ]
+    }
+    ```
+
+    **Errors:**
+    - 400 Bad Request: if `"query"` is missing or empty.
+    - 401 Unauthorized: if the user is not authenticated.
+
+    **Permissions:**  
+    - `IsAuthenticated`
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs) -> Response:
+        payload = request.data
+        has_query = "query" in payload and payload["query"].strip() != ""
+        has_keywords = "keywords" in payload and isinstance(payload["keywords"], list)
+
+        if has_query and has_keywords:
+            return Response(
+                {"detail": "Please supply only one of 'query' or 'keywords'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not has_query and not has_keywords:
+            return Response(
+                {"detail": "You must supply either 'query' or 'keywords'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # parse k
+        try:
+            k = int(payload.get("k", 10))
+        except (TypeError, ValueError):
+            return Response({"detail": "'k' must be an integer."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # **either** single query…
+        if has_query:
+            q = payload["query"].strip()
+            start = time.perf_counter()
+            elapsed, recs = retrieve_distinct_edujob_chunks(query=q, top_k=k)
+            elapsed = time.perf_counter() - start
+
+        # **or** multiple keywords…
+        else:
+            keywords = payload["keywords"]
+            if not all(isinstance(w, str) and w.strip() for w in keywords):
+                return Response(
+                    {"detail": "'keywords' must be a list of non-empty strings."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            start = time.perf_counter()
+            elapsed, recs = retrieve_by_keywords(keywords=keywords, top_k=k)
+            elapsed = time.perf_counter() - start
+
+        return Response({
+            "elapsed": round(elapsed, 4),
+            "recommendations": recs
+        })
 
 # @api_view(["POST"])
 # @permission_classes([IsAuthenticated])
