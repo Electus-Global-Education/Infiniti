@@ -238,6 +238,37 @@ def fetch_youtube_transcript(video_url: str) -> Optional[str]:
         print(f"[ERROR] Formatting transcript failed: {e}")
         return None
 
+def fetch_youtube_title(video_url: str) -> Optional[str]:
+    """
+    Fetches the title of a YouTube video by scraping its HTML <title> tag.
+    Strips the trailing " - YouTube" suffix.
+    """
+    video_id = extract_video_id(video_url)
+    print(f"[DEBUG] Extracted video ID for title: {video_id}")
+    if not video_id:
+        print(f"[ERROR] Invalid YouTube URL: {video_url}")
+        return None
+
+    try:
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        resp = requests.get(url)
+        resp.raise_for_status()
+        match = re.search(r"<title>(.*?)</title>", resp.text, re.IGNORECASE | re.DOTALL)
+        if not match:
+            print(f"[ERROR] Could not parse title for video ID: {video_id}")
+            return None
+        # Remove the " - YouTube" suffix that appears in the HTML title
+        title = match.group(1).replace(" - YouTube", "").strip()
+        print(f"[DEBUG] Fetched video title: {title}")
+        return title
+    except requests.RequestException as e:
+        print(f"[ERROR] HTTP error fetching title: {e}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Unexpected error fetching title: {e}")
+        return None
+
+
 @shared_task
 def process_video_chunks_task(video_url: str) -> Dict[str, object]:
 
@@ -269,6 +300,9 @@ def process_video_chunks_task(video_url: str) -> Dict[str, object]:
     """
 
     start_time = time.perf_counter()
+
+    title: Optional[str] = fetch_youtube_title(video_url)
+    print(f"[DEBUG] Fetched video title: {title}")
 
     result: Dict[str, object] = {
         "video_url": video_url,
@@ -349,11 +383,15 @@ def process_video_chunks_task(video_url: str) -> Dict[str, object]:
         next_index += 1
 
         metadata = {
+            "title": title, 
             "text": chunk_text,
             "chunk_text": chunk_text,
             "chunk_index": i,
             "source_link": video_url,
         }
+        print("Metadata:")
+        for key, value in metadata.items():
+            print(f"{key}: {value}")
 
         try:
             vector_store.add_texts([chunk_text], metadatas=[metadata], ids=[chunk_id])
@@ -750,12 +788,16 @@ def process_document_task(file_path: str, original_filename: str) -> Dict[str, o
             next_index += 1
 
             metadata = {
+                "title": original_filename,
                 "text": chunk_text,
                 "chunk_text": chunk_text,
                 "chunk_index": i,
                 "source_file": safe_filename,
                 "original_filename": original_filename,
             }
+            print("Metadata:")
+            for key, value in metadata.items():
+                print(f"{key}: {value}")
 
             vector_store.add_texts([chunk_text], metadatas=[metadata], ids=[new_id])
             result["inserted_ids"].append(new_id)
