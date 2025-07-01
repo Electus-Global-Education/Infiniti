@@ -1,4 +1,6 @@
 # fund_finder/views.py
+import time
+from typing import List, Any, Optional
 from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
@@ -13,7 +15,7 @@ from django.core.management import call_command
 import io
 from celery.result import AsyncResult
 import contextlib
-from fund_finder.retrieval import retrieve_grant_chunks_grouped, retrieve_distinct_grant_recs
+from fund_finder.retrieval import retrieve_grant_chunks_grouped, retrieve_distinct_grant_recs, retrieve_by_grant_keywords
 from .tasks import index_grant_opportunity_task, generate_grant_proposal_task
 from .models import FunderType, FunderProfile, GrantOpportunity
 from .serializers import (
@@ -326,6 +328,12 @@ class GrantRecommendationAPIView(APIView):
       "query": "string",            // Required. A natural language query or keywords describing the user's funding needs.
       "k": 10                       // Optional. Number of top recommendations to return (default: 5).
     }
+
+    OR
+     {
+      "keywords": ["climate change","renewable energy"] // Required. A natural language query or keywords describing the user's funding needs.
+      "k": 10                       // Optional. Number of top recommendations to return (default: 5).
+    }
     ```
 
     **Response:**
@@ -357,23 +365,52 @@ class GrantRecommendationAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        q          = request.data.get("query", "").strip()
-        k          = int(request.data.get("k", 5))
-        funder_ids = request.data.get("funder_ids", None)
+        payload = request.data
+        has_q = bool(str(payload.get("query", "")).strip())
+        has_kw = isinstance(payload.get("keywords"), list)
 
-        if not q:
+        if has_q and has_kw:
             return Response(
-                {"detail": "The 'query' field is required."},
+                {"detail": "Please supply only one of 'query' or 'keywords'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not has_q and not has_kw:
+            return Response(
+                {"detail": "You must supply either 'query' or 'keywords'."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        elapsed, recs = retrieve_distinct_grant_recs(
-            query=q,
-            funder_ids=funder_ids,
-            top_k=k
-        )
-        return Response({"elapsed": elapsed, "recommendations": recs})
+        funder_ids = payload.get("funder_ids", None)
+        try:
+            k = int(payload.get("k", 5))
+        except (TypeError, ValueError):
+            return Response({"detail": "'k' must be an integer."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
+        if has_q:
+            q = payload["query"].strip()
+            start = time.perf_counter()
+            elapsed, recs = retrieve_distinct_grant_recs(
+                query=q, funder_ids=funder_ids, top_k=k
+            )
+            elapsed = time.perf_counter() - start
+        else:
+            keywords: List[str] = payload["keywords"]
+            if not all(isinstance(w, str) and w.strip() for w in keywords):
+                return Response(
+                    {"detail": "'keywords' must be a list of non-empty strings."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            start = time.perf_counter()
+            elapsed, recs = retrieve_by_grant_keywords(
+                keywords=keywords, funder_ids=funder_ids, top_k=k
+            )
+            elapsed = time.perf_counter() - start
+
+        return Response({
+            "elapsed": round(elapsed, 4),
+            "recommendations": recs
+        })
 
 class GenerateProposalAsyncAPIView(APIView):
     """

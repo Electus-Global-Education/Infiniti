@@ -171,22 +171,19 @@ def retrieve_distinct_grant_recs(
     1. Embed the user’s query.
     2. Filter to only grant_opportunity docs (and optional funders).
     3. Top-K similarity search.
-    4. Dedupe on grant_id so each grant appears once, keeping its
-       highest-scoring chunk as the “representative.”
+    4. Dedupe on grant_id, keeping the highest‐scoring chunk per grant.
     Returns (elapsed_sec, [ {grant_id, title, snippet, score, metadata}, … ])
     """
-    # 1. Embed
     cleaned = query.strip()
     if not cleaned:
         raise ValueError("Query cannot be empty.")
     emb = embedding_model.embed_documents([cleaned])[0]
 
-    # 2. Build metadata Namespaces
+    # build namespaces filter
     namespaces = [Namespace("doc_type", ["grant_opportunity"], [])]
     if funder_ids:
         namespaces.append(Namespace("funder_id", funder_ids, []))
 
-    # 3. Search
     start = time.time()
     hits = vector_store.similarity_search_by_vector_with_score(
         embedding=emb,
@@ -195,20 +192,53 @@ def retrieve_distinct_grant_recs(
     )
     elapsed = time.time() - start
 
-    # 4. Dedupe per grant, keeping the top-scoring chunk for each
     seen: set[str] = set()
     recs: List[Dict[str, Any]] = []
     for doc, score in hits:
-        meta = doc.metadata
-        gid = meta["grant_id"]
-        if gid in seen:
+        gid = doc.metadata.get("grant_id")
+        if not gid or gid in seen:
             continue
         seen.add(gid)
         recs.append({
             "grant_id": gid,
-            "title":     meta.get("title"),
-            "snippet":   doc.page_content,   # representative chunk
+            "title":     doc.metadata.get("title"),
+            "snippet":   doc.page_content,
             "score":     score,
-            "metadata":  meta,
+            "metadata":  doc.metadata,
         })
+
     return elapsed, recs
+
+
+def retrieve_by_grant_keywords(
+    keywords: List[str],
+    funder_ids: Optional[List[str]] = None,
+    top_k: int = 5
+) -> Tuple[float, List[Dict[str, Any]]]:
+    """
+    Run retrieve_distinct_grant_recs for each keyword, tag each hit with
+    'matched_keyword', then dedupe by grant_id (highest‐score wins).
+    Returns (total_elapsed_sec, distinct_recs).
+    """
+    total_elapsed = 0.0
+    all_hits: List[Dict[str, Any]] = []
+
+    for kw in keywords:
+        elapsed, recs = retrieve_distinct_grant_recs(
+            query=kw,
+            funder_ids=funder_ids,
+            top_k=top_k
+        )
+        total_elapsed += elapsed
+        for r in recs:
+            r["matched_keyword"] = kw
+            all_hits.append(r)
+
+    # dedupe by grant_id, keep best
+    best: Dict[str, Dict[str, Any]] = {}
+    for hit in all_hits:
+        gid = hit["grant_id"]
+        if gid not in best or hit["score"] > best[gid]["score"]:
+            best[gid] = hit
+
+    return total_elapsed, list(best.values())
