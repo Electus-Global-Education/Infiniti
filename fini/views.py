@@ -364,7 +364,7 @@ class VoiceQuerySubmitView(APIView):
     """
     🎙️ Submit Voice Query for LLM-Based Response
 
-This endpoint accepts either a recorded audio file (via multipart upload) or a base64-encoded audio string, processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task. Returns a `task_id` for tracking.
+This endpoint accepts audio file mp3(via multipart upload) , processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task. Returns a `task_id` for tracking.
 
 ---
 
