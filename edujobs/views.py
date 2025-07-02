@@ -30,8 +30,8 @@ class EduJobChatAPIView(APIView):
 
 ```json
 {
-  "prompt": "Tell me about Imran Khan. Write a short paragraph.", 
-  "model_name": "gemini-2.5-flash-preview-05-20" (optional),
+  "prompt": "Tell me about electus education global. Write a short paragraph.", 
+  "model_name": "gemini-2.5-flash" (optional),
   "temperature": 0.4 (optional)
 }
 ### Response 200 OK (JSON): 
@@ -39,7 +39,7 @@ Returns a JSON object containing the generated response from the model.
 
 ```json
 {
-  "response": "Imran Khan is a former cricketer and the 22nd Prime Minister of Pakistan..."
+  "response": "Electus Education Global is an international education company focused on providing educational opportunities and pathways for students....."
 }
     """
     permission_classes = [IsAuthenticated]

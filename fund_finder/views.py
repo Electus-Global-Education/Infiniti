@@ -28,7 +28,7 @@ from core.utils import generate_gemini_response
 from core.models import Organization
 from core.audit_utils import create_audit_log_entry
 
-DEFAULT_MODEL       = "gemini-2.5-flash-preview-05-20"
+DEFAULT_MODEL       = "gemini-2.5-flash"
 DEFAULT_TEMPERATURE = 0.5
 # --- Base ViewSet for Multi-Tenancy Logic ---
 
