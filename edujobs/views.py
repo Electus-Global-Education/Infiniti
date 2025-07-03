@@ -20,13 +20,13 @@ class ChatBotAPIView(APIView):
 ### Request Body (JSON):
 - **prompt** (`str`, required):  
   The input text prompt you want the model to generate a response for.  
-  *Example*: `"Tell me about Imran Khan? Write a short paragraph."`
+  *Example*: `"Tell me about Electus Education Global? Write a short paragraph."`
 
-- **model_name** (`str`, optional):  
+- **model_name** (`str`, optional, default: `gemini-2.5-flash`):  
   The name of the model to use. If not provided, the system will use the default model.  
   *Example*: `"gemini-2.5-flash-preview-05-20"`
 
-- **temperature** (`float`, optional):  
+- **temperature** (`float`, optional, default: 0.5):  
   Controls the randomness of the output. Values range from `0.0` (deterministic) to `1.0` (very random).  
   *Example*: `0.7`
 
@@ -80,13 +80,13 @@ class EduJobChatAPIView(APIView):
 ### Request Body (JSON):
 - **prompt** (`str`, required):  
   The input text prompt you want the model to generate a response for.  
-  *Example*: `"Tell me about Imran Khan? Write a short paragraph."`
+  *Example*: `""Tell me about Electus Education Global? Write a short paragraph."`
 
-- **model_name** (`str`, optional):  
+- **model_name** (`str`, optional, default: `gemini-2.5-flash`):  
   The name of the model to use. If not provided, the system will use the default model.  
   *Example*: `"gemini-2.5-flash-preview-05-20"`
 
-- **temperature** (`float`, optional):  
+- **temperature** (`float`, optional, default: 0.5):  
   Controls the randomness of the output. Values range from `0.0` (deterministic) to `1.0` (very random).  
   *Example*: `0.7`
 
