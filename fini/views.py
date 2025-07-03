@@ -20,12 +20,11 @@ from baserag.utils import generate_query_embedding, retrieve_chunks_by_embedding
 from baserag.utils import fetch_youtube_transcript, preprocess_text, process_video_chunks_task, process_boclips_video_task, process_document_task
 from celery import shared_task
 from fini.edujob_rec import retrieve_distinct_edujob_chunks, retrieve_by_keywords
+from core.utils import generate_gemini_response, ALLOWED_MODELS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
 
 # Default fallback values
 DEFAULT_ROLE = "Student"
 DEFAULT_USER_ID = "none"
-DEFAULT_MODEL = "gemini-2.5-flash"
-DEFAULT_TEMPERATURE = 0.4
 DEFAULT_BASE_PROMPT = (
     "You are an intelligent learning assistant that provides helpful, clear, and concise answers "
 )

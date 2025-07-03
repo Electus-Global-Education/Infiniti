@@ -9,11 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from core.utils import generate_gemini_response
+from core.utils import generate_gemini_response, ALLOWED_MODELS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
 
-# Defaults
-DEFAULT_MODEL       = "gemini-2.5-flash-preview-05-20"
-DEFAULT_TEMPERATURE = 4.0
 
 class ImpactAnalysisAPIView(APIView):
     """

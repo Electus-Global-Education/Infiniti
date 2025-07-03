@@ -48,11 +48,12 @@ CHANNELS = 1         # Mono
 # Model configuration constants
 # List of allowed Gemini model names to prevent misuse or invalid inputs
 ALLOWED_MODELS = [
-    "gemini-2.5-flash-preview-05-20",
+    "gemini-2.5-pro",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite-preview-06-17",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
-    "gemini-2.5-pro-preview-05-06"
+    
 ]
 
 #Fallback model to use if the user provides an invalid or missing model name

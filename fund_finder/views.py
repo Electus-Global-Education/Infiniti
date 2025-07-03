@@ -24,12 +24,10 @@ from .serializers import (
     GrantFileUploadSerializer, ErrorResponseSerializer
 )
 # from .services import FundFinderService # Commented out until it's ready
-from core.utils import generate_gemini_response
+from core.utils import generate_gemini_response, ALLOWED_MODELS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
 from core.models import Organization
 from core.audit_utils import create_audit_log_entry
 
-DEFAULT_MODEL       = "gemini-2.5-flash"
-DEFAULT_TEMPERATURE = 0.5
 # --- Base ViewSet for Multi-Tenancy Logic ---
 
 class ScopedViewSet(viewsets.ModelViewSet):
