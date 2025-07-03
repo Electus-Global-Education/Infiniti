@@ -1,109 +1,165 @@
 from django.shortcuts import render
-
-# Create your views here.
-# impact_analysis/views.py
-
 import time
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-
+from typing import Dict, Any
 from core.utils import generate_gemini_response, ALLOWED_MODELS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
+from impact_analysis.tasks import generate_impact_analysis_task
+from celery.result import AsyncResult
 
 
 class ImpactAnalysisAPIView(APIView):
     """
-    POST /api/impact_analysis/analyze/
 
-    Body JSON:
-    {
-      "instruction":   "<what analysis to perform>",
-      "data":          "<raw data or narrative to analyze>",
-      "model_name":    "<optional, LLM model to use>",
-      "temperature":   <optional, sampling temperature>,
-      "org_id":        "<optional, organization identifier>",
-      "report_params": "<optional, extra instructions or sample report text>"
-    }
+    This endpoint accepts instructions and raw data to perform an impact analysis report using an LLM model.  
+    The task runs asynchronously, and a `task_id` is returned to check the status and get the final report later.
 
-    Returns 200:
-    {
-      "report": "<generated analysis narrative>",
-      "meta": {
-        "model_name":   "<used model>",
-        "temperature":  <used temperature>,
-        "org_id":       "<org id or null>",
-        "report_params":"<echoed report_params>",
-        "timing_sec": {
-          "llm_generation": <llm call time>,
-          "total":          <total request time>
-        }
-      }
-    }
+### Endpoint:
+**POST** `/api/impact_analysis/analyze/`
+
+### Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: `Api-Key <your_api_key>`
+
+### Request Body (JSON):
+- **instruction** (`str`, required):  
+  A short text describing what analysis to perform or what kind of report to generate.  
+  *Example*: `"Analyze the social and economic impact of the proposed education policy."`
+
+- **data** (`str` or `object`, required):  
+  Raw text data, narrative, or structured data to be analyzed by the model.  
+  *Example*: `"The proposed policy includes subsidies for schools in rural areas..."`
+
+- **model_name** (`str`, optional):  
+  The name of the LLM model to use. Defaults to `"gemini-2.5-flash"`.  
+  *Example*: `"gemini-2.5-flash-preview-05-20"`
+
+- **temperature** (`float`, optional):  
+  Controls the creativity or randomness of the output. Typical range is `0.0` (deterministic) to `1.0` (very creative). Defaults to `0.5`.  
+  *Example*: `0.7`
+
+- **org_id** (`str`, optional):  
+  An organization identifier to include in the metadata.  
+  *Example*: `"org-1234"`
+
+- **report_params** (`str`, optional):  
+  Additional instructions, formatting guidelines, or sample text to guide report generation.  
+  *Example*: `"Please generate an executive summary with bullet points."`
+
+#### Example Request:
+```json
+{
+  "instruction": "Analyze the potential economic impact of this investment plan.",
+  "data": "The investment plan includes allocating funds to infrastructure and education...",
+  "model_name": "gemini-2.5-flash",
+  "temperature": 0.4,
+  "org_id": "org-5678",
+  "report_params": "Executive summary format"
+}
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        start = time.time()
+        # Extract and sanitize the required and optional fields from the incoming JSON payload
+        instr = request.data.get("instruction", "").strip()  # Instruction describing what analysis to perform
+        data  = request.data.get("data")                     # Raw text, narrative, or data to analyze
+        model = request.data.get("model_name", "")           # Optional: model name override
+        temp  = request.data.get("temperature")              # Optional: temperature control
+        org   = request.data.get("org_id", "")               # Optional: organization identifier
+        params= request.data.get("report_params", "")        # Optional: extra report formatting instructions
 
-        instruction  = request.data.get("instruction", "").strip()
-        data         = request.data.get("data")
-        model_name   = request.data.get("model_name", DEFAULT_MODEL)
-        report_params= request.data.get("report_params", "").strip()
-        org_id       = request.data.get("org_id")
-
-        # validate required fields
-        if not instruction:
-            return Response(
-                {"detail": "The 'instruction' field is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Validate required fields: 'instruction' must be present and non-empty
+        if not instr:
+            return Response({"detail": "The 'instruction' field is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        # Validate required field: 'data' must be present and non-empty (if string)
         if data is None or (isinstance(data, str) and not data.strip()):
-            return Response(
-                {"detail": "The 'data' field is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": "The 'data' field is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # parse temperature
+        # Safely cast the temperature value to float (or use default if missing)
         try:
-            temperature = float(request.data.get("temperature", DEFAULT_TEMPERATURE))
+            temperature = float(temp) if temp is not None else DEFAULT_TEMPERATURE  # you'll need to import DEFAULT_MODEL/TEMPERATURE
         except (TypeError, ValueError):
-            return Response(
-                {"detail": "'temperature' must be a number."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            # Return a clear validation error if temperature isn't a valid float
+            return Response({"detail": "'temperature' must be a number."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # build prompt
-        prompt_parts = []
-        if org_id:
-            prompt_parts.append(f"Organization ID: {org_id}")
-        prompt_parts.append(f"Instruction: {instruction}")
-        prompt_parts.append(f"Data:\n{data}")
-        if report_params:
-            prompt_parts.append(f"Report Parameters:\n{report_params}")
-        prompt = "\n\n".join(prompt_parts) + "\n\nPlease generate the impact analysis report as instructed."
-
-        # call LLM
-        llm_start = time.time()
-        llm_resp  = generate_gemini_response(prompt, model_name, temperature)
-        report    = llm_resp.get("response", "[No response]")
-        llm_time  = time.time() - llm_start
-
-        total_time = time.time() - start
-
-        return Response(
-            {
-                "report": report,
-                "meta": {
-                    "model_name":   model_name,
-                    "temperature":  temperature,
-                    "org_id":       org_id,
-                    "report_params": report_params,
-                    "timing_sec": {
-                        "llm_generation": round(llm_time, 3),
-                        "total":          round(total_time, 3),
-                    }
-                }
-            },
-            status=status.HTTP_200_OK
+        
+        # Enqueue the asynchronous Celery task to perform the impact analysis
+        # The task will run in the background and return a unique task ID to track the result
+        task = generate_impact_analysis_task.delay(
+            instr, data, model, temperature, org, params
         )
+        # Respond immediately with HTTP 202 Accepted and return the task ID
+        # The client can later check the task result by calling the analyze-result endpoint
+        return Response({"task_id": task.id}, status=status.HTTP_202_ACCEPTED)
+
+
+class ImpactAnalysisResultAPIView(APIView):
+    """
+    PThis endpoint retrieves the status and result of a previously submitted Impact Analysis task.  
+    Use it to track and fetch the final report generated by the background language model (LLM) task.
+
+### Endpoint:
+**POST** `/api/impact_analysis/analyze/result/`
+
+### Request Headers:
+- **Content-Type**: `application/json`
+- **Authorization**: `Api-Key <your_api_key>`
+
+### Request Body (JSON):
+- **task_id** (`str`, required):  
+  The unique Celery task ID received when the analysis was initially submitted.  
+  *Example*: `"e4b4b03e-81b0-4c67-94c0-6010af0beaf5"`
+
+#### Example:
+```json
+{
+  "task_id": "e4b4b03e-81b0-4c67-94c0-6010af0beaf5"
+}
+
+#### Example Response:
+"PENDING": Task is waiting in the queue.
+
+"RECEIVED": Task has been picked up by a worker.
+
+"STARTED": Task is currently being processed.
+
+"SUCCESS": Task completed successfully and includes the generated report and metadata.
+
+"FAILURE": Task failed; an error message is provided.
+    """
+    permission_classes = [IsAuthenticated]
+    # Extract the task_id from the request JSON and remove extra spaces
+    def post(self, request, *args, **kwargs):
+        task_id = request.data.get("task_id", "").strip()
+        # Validate that task_id is provided; return 400 if missing
+        if not task_id:
+            return Response({"detail": "The 'task_id' field is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+         # Initialize AsyncResult using the provided task_id and the configured Celery app
+        async_result = AsyncResult(task_id, app=generate_impact_analysis_task.app)
+        # Capture the current state of the task: can be PENDING, RECEIVED, STARTED, SUCCESS, or FAILURE
+        # If the task is still running or waiting, return the current status so the client knows to keep polling
+        state = async_result.state
+        if state in ("PENDING", "RECEIVED", "STARTED"):
+            return Response({"status": state})
+
+         # If the task finished successfully, return status plus the generated report and metadata
+        if async_result.successful():
+            # The expected result should be a dict with keys like 'report', 'meta', etc.
+            result: Any = async_result.result  
+            return Response({"status": "SUCCESS", **result})
+
+         # If the task failed, return the failure status and include the error message for transparency
+        if async_result.failed():
+            return Response(
+                {"status": "FAILURE", "error": str(async_result.result)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        # As a fallback, return the raw state if it doesn't match any known or handled status
+        return Response({"status": state})

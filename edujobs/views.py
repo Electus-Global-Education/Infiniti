@@ -26,7 +26,7 @@ class ChatBotAPIView(APIView):
   The name of the model to use. If not provided, the system will use the default model.  
   *Example*: `"gemini-2.5-flash-preview-05-20"`
 
-- **temperature** (`float`, optional, default: 0.5):  
+- **temperature** (`float`, optional, `default: 0.5`):  
   Controls the randomness of the output. Values range from `0.0` (deterministic) to `1.0` (very random).  
   *Example*: `0.7`
 
@@ -86,7 +86,7 @@ class EduJobChatAPIView(APIView):
   The name of the model to use. If not provided, the system will use the default model.  
   *Example*: `"gemini-2.5-flash-preview-05-20"`
 
-- **temperature** (`float`, optional, default: 0.5):  
+- **temperature** (`float`, optional, `default: 0.5`):  
   Controls the randomness of the output. Values range from `0.0` (deterministic) to `1.0` (very random).  
   *Example*: `0.7`
 
@@ -110,14 +110,22 @@ Returns a JSON object containing the generated response from the model.
 
     def post(self, request, *args, **kwargs):
         prompt = request.data.get("prompt", "").strip()
+        # Extract optional fields:
+        # - 'model_name': which LLM model to use; defaults applied later if empty
+        # - 'temperature': controls creativity/randomness of the response
         model_name = request.data.get("model", "").strip()
         temperature = request.data.get("temperature")
 
+        # Validate: prompt must be provided and not empty
         if not prompt:
             return Response({"detail": "Prompt is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # enqueue
+        # Enqueue the request to an asynchronous Celery task:
+        # - generate_edujob_chat_task will handle calling the LLM and building the response.
+        # - Returns a task_id that the client can use to check the result later.
         task = generate_edujob_chat_task.delay(prompt, model_name, temperature)
+
+        # Respond with HTTP 202 Accepted and include the task_id
         return Response({"task_id": task.id}, status=status.HTTP_202_ACCEPTED)
 
 class EduJobChatResultAPIView(APIView):
@@ -143,26 +151,32 @@ class EduJobChatResultAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
+        # Extract and sanitize the 'task_id' field from the request JSON
         task_id = request.data.get("task_id", "").strip()
+         # Validate: task_id must be provided; if missing, return 400 Bad Request
         if not task_id:
             return Response(
                 {"detail": "The 'task_id' field is required in the request body."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
+        # Initialize AsyncResult object to track the current state of the task
         async_result = AsyncResult(task_id, app=generate_edujob_chat_task.app)
-
+        # Check the current state of the task:
+        # If the task is waiting in queue, picked up, or currently running,
+        # return the status so the client knows to keep polling.
         if async_result.state in ("PENDING", "RECEIVED", "STARTED"):
             return Response({"status": async_result.state})
 
+         # If the task completed successfully, return status "SUCCESS" and include the task's result data
         if async_result.successful():
             data = async_result.result  # dict from the task
             return Response({"status": "SUCCESS", **data})
 
+        # If the task failed, return status "FAILURE" and include the error message for transparency
         if async_result.failed():
             return Response({
                 "status": "FAILURE",
                 "error": str(async_result.result)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        # Fallback: if the task is in an unexpected state, return its raw state
         return Response({"status": async_result.state})
