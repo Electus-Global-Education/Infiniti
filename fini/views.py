@@ -101,7 +101,13 @@ This endpoint accepts a user query and optional parameters to guide how the quer
         user_query = data.get("user_query", "").strip()
          # If user_query is missing or empty, return a 400 error
         if not user_query:
-            return Response({"error": "user_query is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {
+                    "error": "user_query is required.",
+                    "code": status.HTTP_400_BAD_REQUEST   # ← include code in body
+                },
+                status=status.HTTP_400_BAD_REQUEST      # ← still send 400 status
+            )
 
         # Extract optional parameters or use default values
         user_role = data.get("user_role", DEFAULT_ROLE)
@@ -195,8 +201,13 @@ This endpoint accepts a user query and optional parameters to guide how the quer
             return Response(payload, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {
+                    "error": str(e),
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class TTSStatusView(APIView):
     permission_classes = [IsAuthenticated]
