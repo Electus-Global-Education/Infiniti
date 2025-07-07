@@ -103,7 +103,7 @@ This endpoint accepts a user query and optional parameters to guide how the quer
         if not user_query:
             return Response(
                 {
-                    "error": "user_query is required.",
+                    "message": "user_query is required.",
                     "code": status.HTTP_400_BAD_REQUEST   # ← include code in body
                 },
                 status=status.HTTP_400_BAD_REQUEST      # ← still send 400 status
@@ -203,7 +203,7 @@ This endpoint accepts a user query and optional parameters to guide how the quer
         except Exception as e:
             return Response(
                 {
-                    "error": str(e),
+                    "message": str(e),
                     "code": status.HTTP_500_INTERNAL_SERVER_ERROR
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
