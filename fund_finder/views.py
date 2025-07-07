@@ -248,6 +248,8 @@ class IngestGrantOpportunitiesAPIView(APIView):
             {
                 'triggered_count': len(triggered_ids),
                 'triggered_ids': triggered_ids,
+                'message': 'Success.',
+                'code': status.HTTP_200_OK
             },
             status=status.HTTP_200_OK
         )
@@ -291,7 +293,8 @@ class RetrieveGrantChunksAPIView(APIView):
 
         if not q:
             return Response(
-                {"detail": "The 'query' field is required."},
+                {"message": "The 'query' field is required.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -303,7 +306,10 @@ class RetrieveGrantChunksAPIView(APIView):
         )
 
         return Response(
-            {"elapsed": elapsed, "results": results},
+            {"elapsed": elapsed, 
+             "results": results, 
+             "message": "Success.",
+             "code": status.HTTP_200_OK},
             status=status.HTTP_200_OK
         )
 
@@ -369,12 +375,14 @@ class GrantRecommendationAPIView(APIView):
 
         if has_q and has_kw:
             return Response(
-                {"detail": "Please supply only one of 'query' or 'keywords'."},
+                {"message": "Please supply only one of 'query' or 'keywords'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
         if not has_q and not has_kw:
             return Response(
-                {"detail": "You must supply either 'query' or 'keywords'."},
+                {"message": "You must supply either 'query' or 'keywords'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -382,7 +390,8 @@ class GrantRecommendationAPIView(APIView):
         try:
             k = int(payload.get("k", 5))
         except (TypeError, ValueError):
-            return Response({"detail": "'k' must be an integer."},
+            return Response({"message": "'k' must be an integer.",
+                             "code": status.HTTP_400_BAD_REQUEST},
                             status=status.HTTP_400_BAD_REQUEST)
 
         if has_q:
@@ -396,7 +405,8 @@ class GrantRecommendationAPIView(APIView):
             keywords: List[str] = payload["keywords"]
             if not all(isinstance(w, str) and w.strip() for w in keywords):
                 return Response(
-                    {"detail": "'keywords' must be a list of non-empty strings."},
+                    {"message": "'keywords' must be a list of non-empty strings.",
+                     "code": status.HTTP_400_BAD_REQUEST},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             start = time.perf_counter()
@@ -407,8 +417,12 @@ class GrantRecommendationAPIView(APIView):
 
         return Response({
             "elapsed": round(elapsed, 4),
-            "recommendations": recs
-        })
+            "recommendations": recs,
+            "message": "Success.",
+            "code": status.HTTP_200_OK
+        }, status=status.HTTP_200_OK
+        )
+        
 
 class GenerateProposalAsyncAPIView(APIView):
     """
@@ -466,7 +480,8 @@ class GenerateProposalAsyncAPIView(APIView):
 
         if not grant_title:
             return Response(
-                {"detail": "The 'grant_title' field is required."},
+                {"message": "The 'grant_title' field is required.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -479,7 +494,10 @@ class GenerateProposalAsyncAPIView(APIView):
             model_name,
             temperature
         )
-        return Response({"task_id": task.id}, status=status.HTTP_202_ACCEPTED)
+        return Response({"message": "Success: Proposal generation task started.",
+                         "task_id": task.id,
+                         "code": status.HTTP_202_ACCEPTED},
+                         status=status.HTTP_202_ACCEPTED)
 
 
 class ProposalStatusAPIView(APIView):
@@ -539,7 +557,8 @@ class ProposalStatusAPIView(APIView):
         task_id = request.data.get("task_id")
         if not task_id:
             return Response(
-                {"detail": "The 'task_id' field is required in the request body."},
+                {"message": "The 'task_id' field is required in the request body.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -547,16 +566,21 @@ class ProposalStatusAPIView(APIView):
         state     = async_res.state
 
         if state in ("PENDING", "STARTED", "RETRY"):
-            return Response({"status": state})
+            return Response({"message": state, 
+                             "code": status.HTTP_202_ACCEPTED},
+                            status=status.HTTP_200_OK)
 
         if state == "SUCCESS":
             # The task returns the proposal string
             proposal = async_res.result
-            return Response({"status": state, "proposal": proposal})
+            return Response({"message": state, "proposal": proposal, 
+                             "code": status.HTTP_200_OK},
+                            status=status.HTTP_200_OK)
 
         # Anything else is FAILURE
         error_msg = str(async_res.result)
         return Response(
-            {"status": state, "error": error_msg},
+            {"status": state, "message": error_msg, 
+             "code": status.HTTP_500_INTERNAL_SERVER_ERROR},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

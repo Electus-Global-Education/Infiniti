@@ -41,14 +41,18 @@ from rest_framework import status
 def test_vector_query(request):
     request_serializer = VectorQueryRequestSerializer(data=request.data)
     if not request_serializer.is_valid():
-        return Response(request_serializer.errors, status=400)
+        return Response({"message":request_serializer.errors,
+                        "code": status.HTTP_400_BAD_REQUEST},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     query = request_serializer.validated_data.get("query")
     
     try:
         embedding = embedding_model.embed_documents([query])[0]
         if not embedding:
-            return Response({"error": "Failed to generate embedding"}, status=400)
+            return Response({"message": "Failed to generate embedding",
+                             "code": status.HTTP_400_BAD_REQUEST}, 
+                             status=status.HTTP_400_BAD_REQUEST)
 
         start = time.time()
         results = vector_store.similarity_search_by_vector_with_score(embedding, k=5)
@@ -70,7 +74,9 @@ def test_vector_query(request):
         return Response(response_serializer.data)
 
     except Exception as e:
-        return Response({"error": f"Vector store query failed: {str(e)}"}, status=500)
+        return Response({"message": f"Vector store query failed: {str(e)}",
+                         "code": status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -120,9 +126,12 @@ This endpoint accepts a textual query and returns a high-dimensional vector (emb
             "elapsed": f"{elapsed:.2f} seconds"
         })
     except ValueError as ve:
-        return Response({"error": str(ve)}, status=400)
+        return Response({"message": str(ve),
+                          "code": status.HTTP_400_BAD_REQUEST}, 
+                             status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
+        return Response({"error": f"Unexpected error: {str(e)}", "code": status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -172,9 +181,12 @@ This endpoint accepts a textual query and returns a high-dimensional vector (emb
             "elapsed": f"{elapsed:.2f} seconds"
         })
     except ValueError as ve:
-        return Response({"error": str(ve)}, status=400)
+        return Response({"message": str(ve),"code": status.HTTP_400_BAD_REQUEST}, 
+                             status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
+        return Response({"message": f"Unexpected error: {str(e)}",
+                          "code": status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -186,13 +198,15 @@ def retrieve_top_chunks(request):
     """
     query = request.data.get("query", "").strip()
     if not query:
-        return Response({"error": "Query is required."}, status=400)
+        return Response({"message": "Query is required.", "code": status.HTTP_400_BAD_REQUEST}, 
+                             status=status.HTTP_400_BAD_REQUEST)
 
     try:
         # Step 1: Generate embedding
         embedding = generate_query_embedding(query)
         if not embedding:
-            return Response({"error": "Failed to generate embedding."}, status=500)
+            return Response({"message": "Failed to generate embedding.", "code": status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Step 2: Retrieve chunks
         elapsed, results = retrieve_chunks_by_embedding(embedding)
@@ -210,7 +224,8 @@ def retrieve_top_chunks(request):
         })
 
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        return Response({"message": str(e), "code": status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class YouTubeTranscriptAPIView(APIView):
     """
@@ -253,14 +268,16 @@ This endpoint accepts a list of YouTube video URLs, retrieves their transcripts 
         data = request.data
         if not isinstance(data, dict):
             return Response(
-                {"error": "`{}` body must be a JSON object with a key 'urls'".format(data)},
+                {"error": "`{}` body must be a JSON object with a key 'urls'".format(data),
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         video_urls = data.get("urls")
         if not isinstance(video_urls, list):
             return Response(
-                {"error": "`urls` must be a list of YouTube video URLs."},
+                {"error": "`urls` must be a list of YouTube video URLs.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -292,6 +309,8 @@ This endpoint accepts a list of YouTube video URLs, retrieves their transcripts 
             "failed_urls": failed_urls,
             "elapsed_times": elapsed_times,
             "total_elapsed": total_elapsed,
+            "message": "Transcript retrieval completed.",
+            "code": status.HTTP_200_OK
         }, status=status.HTTP_200_OK)
 
 class UploadDocumentAPIView(APIView):
@@ -335,7 +354,8 @@ curl -X POST http://localhost:8000/api/fini/upload-document/ \
         uploaded_file = request.FILES.get("document")
         if not uploaded_file:
             return Response(
-                {"error": "No file provided under 'document'."},
+                {"message": "No file provided under 'document'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -344,7 +364,8 @@ curl -X POST http://localhost:8000/api/fini/upload-document/ \
         _, ext = os.path.splitext(filename.lower())
         if ext not in (".docx", ".pdf"):
             return Response(
-                {"error": "Unsupported file type. Only .docx and .pdf are allowed."},
+                {"message": "Unsupported file type. Only .docx and .pdf are allowed.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -359,7 +380,8 @@ curl -X POST http://localhost:8000/api/fini/upload-document/ \
                     destination.write(chunk)
         except Exception as e:
             return Response(
-                {"error": f"Failed to save uploaded file: {e}"},
+                {"message": f"Failed to save uploaded file: {e}",
+                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -370,6 +392,7 @@ curl -X POST http://localhost:8000/api/fini/upload-document/ \
             {
                 "message": "Enqueued document for processing.",
                 "task_id": task.id,
+                "code": status.HTTP_202_ACCEPTED,
             },
             status=status.HTTP_202_ACCEPTED,
         )
@@ -416,9 +439,12 @@ This endpoint allows you to track the status of a Celery task submitted for docu
         task_id = data.get("task_id")
         if not isinstance(task_id, str):
             return Response(
-                {"error": "`task_id` must be provided as a string."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        {
+            "message": "`task_id` must be provided as a string.",
+            "code": status.HTTP_400_BAD_REQUEST
+        },
+        status=status.HTTP_400_BAD_REQUEST,
+    )
 
         async_result = AsyncResult(task_id)
         response_data = {"task_id": task_id, "status": async_result.status}
@@ -427,7 +453,8 @@ This endpoint allows you to track the status of a Celery task submitted for docu
             try:
                 response_data["result"] = async_result.get(timeout=1)
             except Exception as e:
-                response_data["error"] = str(e)
+                response_data["message"] = str(e)
+                response_data["code"] = status.HTTP_200_OK
 
         return Response(response_data, status=status.HTTP_200_OK)
 class CheckBoclipsTaskStatusAPIView(APIView):
@@ -469,23 +496,29 @@ This endpoint allows clients to query the current status of an asynchronous Cele
         task_id = data.get("task_id")
         if not isinstance(task_id, str):
             return Response(
-                {"error": "`task_id` must be provided as a string."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            {
+                "message": "`task_id` must be provided as a string.",
+                "code": status.HTTP_400_BAD_REQUEST
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
         async_result = AsyncResult(task_id)
         if not async_result:
             return Response(
-                {"error": f"No such task with id '{task_id}'."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
+            {
+                "message": f"No such task with id '{task_id}'.",
+                "code": status.HTTP_404_NOT_FOUND
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
         response_data = {"task_id": task_id, "status": async_result.status}
         if async_result.ready():
             try:
                 response_data["result"] = async_result.get(timeout=1)
             except Exception as e:
-                response_data["error"] = str(e)
+                response_data["message"] = str(e)
+                response_data["code"] = status.HTTP_200_OK
 
         return Response(response_data, status=status.HTTP_200_OK)
 
@@ -528,14 +561,16 @@ This endpoint accepts a list of YouTube video URLs and asynchronously queues a b
         data = request.data
         if not isinstance(data, dict):
             return Response(
-                {"error": "Request body must be a JSON object with a key 'urls'."},
+                {"message": "Request body must be a JSON object with a key 'urls'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         video_urls = data.get("urls")
         if not isinstance(video_urls, list):
             return Response(
-                {"error": "`urls` must be a list of YouTube video URLs."},
+                {"message": "`urls` must be a list of YouTube video URLs.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -548,8 +583,9 @@ This endpoint accepts a list of YouTube video URLs and asynchronously queues a b
         return Response(
             {
                 "message": "Chunk/embedding tasks have been queued.",
+                "code": status.HTTP_202_ACCEPTED,
                 "tasks": task_map
-            },
+                            },
             status=status.HTTP_202_ACCEPTED
         )
 
@@ -593,20 +629,23 @@ This endpoint allows clients to check the current status of a background Celery 
         task_id = data.get("task_id")
         if not isinstance(task_id, str):
             return Response(
-                {"error": "`task_id` must be provided as a string."},
+                {"message": "`task_id` must be provided as a string.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         async_result = AsyncResult(task_id)
         if not async_result:
             return Response(
-                {"error": f"No such task with id '{task_id}'."},
+                {"message": f"No such task with id '{task_id}'.",
+                 "code": status.HTTP_404_NOT_FOUND},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         response_data = {
             "task_id": task_id,
-            "status": async_result.status,  # e.g. "PENDING", "STARTED", "SUCCESS", "FAILURE"
+            "message": async_result.status,  # e.g. "PENDING", "STARTED", "SUCCESS", "FAILURE"
+            "code": status.HTTP_200_OK
         }
         if async_result.ready():
             # If the task finished (either SUCCESS or FAILURE),
@@ -662,14 +701,16 @@ This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, q
         data = request.data
         if not isinstance(data, dict):
             return Response(
-                {"error": "Request body must be a JSON object with a key 'video_ids'."},
+                {"message": "Request body must be a JSON object with a key 'video_ids'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         video_ids = data.get("video_ids")
         if not isinstance(video_ids, list):
             return Response(
-                {"error": "`video_ids` must be a list of Boclips video IDs (strings)."},
+                {"message": "`video_ids` must be a list of Boclips video IDs (strings).",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -682,6 +723,7 @@ This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, q
             {
                 "message": "Boclips chunk/embedding tasks have been queued.",
                 "tasks": task_map,
+                "code": status.HTTP_202_ACCEPTED
             },
             status=status.HTTP_202_ACCEPTED,
         )

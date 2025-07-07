@@ -72,11 +72,13 @@ class ImpactAnalysisAPIView(APIView):
 
         # Validate required fields: 'instruction' must be present and non-empty
         if not instr:
-            return Response({"detail": "The 'instruction' field is required."},
+            return Response({"message": "The 'instruction' field is required.",
+                             "code": status.HTTP_400_BAD_REQUEST},
                             status=status.HTTP_400_BAD_REQUEST)
         # Validate required field: 'data' must be present and non-empty (if string)
         if data is None or (isinstance(data, str) and not data.strip()):
-            return Response({"detail": "The 'data' field is required."},
+            return Response({"message": "The 'data' field is required.",
+                             "code": status.HTTP_400_BAD_REQUEST},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Safely cast the temperature value to float (or use default if missing)
@@ -84,7 +86,8 @@ class ImpactAnalysisAPIView(APIView):
             temperature = float(temp) if temp is not None else DEFAULT_TEMPERATURE  # you'll need to import DEFAULT_MODEL/TEMPERATURE
         except (TypeError, ValueError):
             # Return a clear validation error if temperature isn't a valid float
-            return Response({"detail": "'temperature' must be a number."},
+            return Response({"message": "'temperature' must be a number.",
+                             "code": status.HTTP_400_BAD_REQUEST},
                             status=status.HTTP_400_BAD_REQUEST)
 
         
@@ -95,7 +98,10 @@ class ImpactAnalysisAPIView(APIView):
         )
         # Respond immediately with HTTP 202 Accepted and return the task ID
         # The client can later check the task result by calling the analyze-result endpoint
-        return Response({"task_id": task.id}, status=status.HTTP_202_ACCEPTED)
+        return Response({"task_id": task.id,
+                          "message": 'success',
+                          "code": status.HTTP_202_ACCEPTED }
+                        , status=status.HTTP_202_ACCEPTED)
 
 
 class ImpactAnalysisResultAPIView(APIView):
@@ -138,7 +144,8 @@ class ImpactAnalysisResultAPIView(APIView):
         task_id = request.data.get("task_id", "").strip()
         # Validate that task_id is provided; return 400 if missing
         if not task_id:
-            return Response({"detail": "The 'task_id' field is required."},
+            return Response({"message": "The 'task_id' field is required.",
+                             "code": status.HTTP_400_BAD_REQUEST},
                             status=status.HTTP_400_BAD_REQUEST)
 
          # Initialize AsyncResult using the provided task_id and the configured Celery app
@@ -147,18 +154,26 @@ class ImpactAnalysisResultAPIView(APIView):
         # If the task is still running or waiting, return the current status so the client knows to keep polling
         state = async_result.state
         if state in ("PENDING", "RECEIVED", "STARTED"):
-            return Response({"status": state})
+            return Response({"message": state, 
+                             "code": status.HTTP_202_ACCEPTED},
+                            status=status.HTTP_202_ACCEPTED)
 
          # If the task finished successfully, return status plus the generated report and metadata
         if async_result.successful():
             # The expected result should be a dict with keys like 'report', 'meta', etc.
             result: Any = async_result.result  
-            return Response({"status": "SUCCESS", **result})
+            return Response({"message": "SUCCESS",
+                              **result,
+                              "code": status.HTTP_200_OK},
+                            status=status.HTTP_200_OK)
 
          # If the task failed, return the failure status and include the error message for transparency
         if async_result.failed():
             return Response(
-                {"status": "FAILURE", "error": str(async_result.result)},
+                {"message": "FAILURE",
+                  "status": state,
+                  "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                  "error": str(async_result.result)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         # As a fallback, return the raw state if it doesn't match any known or handled status

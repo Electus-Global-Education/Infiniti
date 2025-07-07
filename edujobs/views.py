@@ -54,7 +54,10 @@ Returns a JSON object containing the generated response from the model.
         temperature = request.data.get("temperature")
 
         if not prompt:
-            return Response({"error": "Prompt is required."}, status=400)
+            return Response({"message": "Prompt is required.",
+                              "code":    status.HTTP_400_BAD_REQUEST},  
+                              status=status.HTTP_400_BAD_REQUEST
+                              )
 
         result = generate_gemini_response(
             prompt=prompt,
@@ -66,6 +69,8 @@ Returns a JSON object containing the generated response from the model.
             #"used_model": model_name if model_name in ALLOWED_MODELS else DEFAULT_MODEL,
            # "used_temperature": temperature if temperature else DEFAULT_TEMPERATURE,
             "response": result["response"],
+            "message": "SUCCESS",
+            "code": status.HTTP_200_OK,
             #"timing": result["elapsed"]
         })
 
@@ -118,7 +123,9 @@ Returns a JSON object containing the generated response from the model.
 
         # Validate: prompt must be provided and not empty
         if not prompt:
-            return Response({"detail": "Prompt is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Prompt is required.",
+                             "code": status.HTTP_400_BAD_REQUEST}, 
+                             status=status.HTTP_400_BAD_REQUEST)
 
         # Enqueue the request to an asynchronous Celery task:
         # - generate_edujob_chat_task will handle calling the LLM and building the response.
@@ -126,7 +133,10 @@ Returns a JSON object containing the generated response from the model.
         task = generate_edujob_chat_task.delay(prompt, model_name, temperature)
 
         # Respond with HTTP 202 Accepted and include the task_id
-        return Response({"task_id": task.id}, status=status.HTTP_202_ACCEPTED)
+        return Response({"task_id": task.id,
+                         "message":task.id,
+                         "code":status.HTTP_202_ACCEPTED}, 
+                         status=status.HTTP_202_ACCEPTED)
 
 class EduJobChatResultAPIView(APIView):
     """
@@ -156,7 +166,8 @@ class EduJobChatResultAPIView(APIView):
          # Validate: task_id must be provided; if missing, return 400 Bad Request
         if not task_id:
             return Response(
-                {"detail": "The 'task_id' field is required in the request body."},
+                {"message": "The 'task_id' field is required in the request body.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
         # Initialize AsyncResult object to track the current state of the task
@@ -165,18 +176,23 @@ class EduJobChatResultAPIView(APIView):
         # If the task is waiting in queue, picked up, or currently running,
         # return the status so the client knows to keep polling.
         if async_result.state in ("PENDING", "RECEIVED", "STARTED"):
-            return Response({"status": async_result.state})
+            return Response({"message": async_result.state,
+                             "code": status.HTTP_202_ACCEPTED},
+                            status=status.HTTP_202_ACCEPTED)
 
          # If the task completed successfully, return status "SUCCESS" and include the task's result data
         if async_result.successful():
             data = async_result.result  # dict from the task
-            return Response({"status": "SUCCESS", **data})
+            return Response({"message": "SUCCESS", **data,
+                             "code": status.HTTP_200_OK},
+                            status=status.HTTP_200_OK)
 
         # If the task failed, return status "FAILURE" and include the error message for transparency
         if async_result.failed():
             return Response({
-                "status": "FAILURE",
-                "error": str(async_result.result)
+                "message": "FAILURE",
+                "error": str(async_result.result),
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         # Fallback: if the task is in an unexpected state, return its raw state
         return Response({"status": async_result.state})

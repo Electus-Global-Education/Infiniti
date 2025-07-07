@@ -252,9 +252,12 @@ If the task has completed successfully, it returns the generated audio in base64
         task_id = request.data.get("task_id")
         if not isinstance(task_id, str):
             return Response(
-                {"error": "`task_id` must be provided as a string."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        {
+            "message": "`task_id` must be provided as a string.",
+            "code": status.HTTP_400_BAD_REQUEST
+        },
+        status=status.HTTP_400_BAD_REQUEST
+        )
 
         async_res = AsyncResult(task_id)
         response_data = {"task_id": task_id, "status": async_res.status}
@@ -266,7 +269,9 @@ If the task has completed successfully, it returns the generated audio in base64
                 response_data["audio"] = res.get("audio_b64", "")
             else:
                 # Celery task failed
-                response_data["error"] = str(async_res.result)
+                response_data["message"] = str(async_res.result)
+                response_data["code"] = status.HTTP_200_OK
+
 
         return Response(response_data, status=status.HTTP_200_OK)
 
@@ -438,7 +443,13 @@ Form-data:
             audio_b64 = request.data.get("audio_data")
 
         if not isinstance(audio_b64, str) or not audio_b64:
-            return Response({"error": "Provide 'audio_file' or 'audio_data' (base64)."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+        {
+            "message": "Provide either 'audio_file' upload or 'audio_data' (base64) in the request.",
+            "code": status.HTTP_400_BAD_REQUEST
+        },
+        status=status.HTTP_400_BAD_REQUEST
+            )
 
         language = request.data.get("language", "en-US")
         user_id = request.data.get("user_id", DEFAULT_USER_ID)
@@ -454,7 +465,13 @@ Form-data:
             base_prompt, model_name,
             temperature, want_audio
         )
-        return Response({"message": "Voice query queued.", "task_id": task.id}, status=status.HTTP_202_ACCEPTED)
+        return Response({
+        "message": "Voice query queued.",
+        "task_id": task.id,
+        "code": status.HTTP_202_ACCEPTED
+        },
+        status=status.HTTP_202_ACCEPTED
+        )
 
 # ----------------------------------------------------------------
 # View: Check Voice Query Status
@@ -492,7 +509,9 @@ It returns the current task state and, if completed, includes the transcribed te
     def post(self, request):
         task_id = request.data.get("task_id")
         if not isinstance(task_id, str):
-            return Response({"error": "`task_id` must be a string."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "`task_id` must be a string.",
+                             "code": status.HTTP_400_BAD_REQUEST}, 
+                             status=status.HTTP_400_BAD_REQUEST)
 
         async_res = AsyncResult(task_id)
         data = {"task_id": task_id, "status": async_res.status}
@@ -502,7 +521,8 @@ It returns the current task state and, if completed, includes the transcribed te
                 result = async_res.result or {}
                 data.update(result)
             else:
-                data["error"] = str(async_res.result)
+                data["message"] = str(async_res.result)
+                data["code"] = status.HTTP_200_OK
 
         return Response(data, status=status.HTTP_200_OK)
     
@@ -565,12 +585,14 @@ class EdujobRecommendationAPIView(APIView):
 
         if has_query and has_keywords:
             return Response(
-                {"detail": "Please supply only one of 'query' or 'keywords'."},
+                {"message": "Please supply only one of 'query' or 'keywords'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
         if not has_query and not has_keywords:
             return Response(
-                {"detail": "You must supply either 'query' or 'keywords'."},
+                {"message": "You must supply either 'query' or 'keywords'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -578,7 +600,8 @@ class EdujobRecommendationAPIView(APIView):
         try:
             k = int(payload.get("k", 10))
         except (TypeError, ValueError):
-            return Response({"detail": "'k' must be an integer."},
+            return Response({"message": "'k' must be an integer.",
+                             "code": status.HTTP_400_BAD_REQUEST},
                             status=status.HTTP_400_BAD_REQUEST)
 
         # **either** single query…
@@ -593,7 +616,8 @@ class EdujobRecommendationAPIView(APIView):
             keywords = payload["keywords"]
             if not all(isinstance(w, str) and w.strip() for w in keywords):
                 return Response(
-                    {"detail": "'keywords' must be a list of non-empty strings."},
+                    {"message": "'keywords' must be a list of non-empty strings.",
+                     "code": status.HTTP_400_BAD_REQUEST},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             start = time.perf_counter()
