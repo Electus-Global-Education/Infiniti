@@ -221,6 +221,32 @@ class IngestGrantOpportunitiesAPIView(APIView):
     API view to trigger background indexing of all GrantOpportunity records
     whose indexing_status is not already "SUCCESS".
 
+    ---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
+
     POST /api/ingest-grants/
       - Enqueues a Celery task (index_grant_opportunity_task) for each grant
         needing indexing.
@@ -257,7 +283,33 @@ class IngestGrantOpportunitiesAPIView(APIView):
 
 class RetrieveGrantChunksAPIView(APIView):
     """
-    POST or GET /api/fund_finder/retrieve-chunks/
+    POST  /api/fund_finder/retrieve-chunks/
+
+    ---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
     {
       "query": "sustainability grants",
       "k": 10,
@@ -325,8 +377,33 @@ class GrantRecommendationAPIView(APIView):
     **Description:**  
     This endpoint allows users to input a natural language query (e.g., a project summary or keyword list) and receive a list of recommended grants.  
     Results are ranked based on semantic relevance using vector similarity search.
+---
 
-    **Request Body (application/json):**
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
+
+    **Request Body (raw/json):**
     ```json
     {
       "query": "string",            // Required. A natural language query or keywords describing the user's funding needs.
@@ -433,12 +510,38 @@ class GenerateProposalAsyncAPIView(APIView):
 
     **Endpoint:**  
     `POST /api/fund_finder/generate-proposal/`
+    
 
     **Description:**  
     This endpoint allows users to initiate a proposal generation process for a specific grant opportunity.  
     It uses a generative language model (e.g., Gemini Pro) to create content based on the input parameters and relevant grant context.
 
-    **Request Body (application/json):**
+    ---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
+    **Request Body (raw/json):**
     ```json
     {
       "grant_title": "string",         // Required. Exact title of the grant.
@@ -511,6 +614,31 @@ class ProposalStatusAPIView(APIView):
 
     **Description:**  
     Clients should provide a valid `task_id` received after initiating a proposal generation via the `generate-proposal` endpoint. This endpoint returns the current execution status of that task, along with the result (the generated proposal) if the task is completed successfully.
+
+---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
 
     **Request Body (application/json):**
     ```

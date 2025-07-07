@@ -39,17 +39,29 @@ This endpoint accepts a user query and optional parameters to guide how the quer
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires **API key**:
-  - Header: `Authorization: Api-Key <your_api_key>`
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `application/json`
-- `Authorization`: `Api-Key <your_api_key>`
-
+- `Content-Type`: `multipart/form-data` **or** `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (JSON):
 
@@ -222,17 +234,29 @@ If the task has completed successfully, it returns the generated audio in base64
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires **API Key** in the header:
-  - `Authorization: Api-Key <your_api_key>`
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `application/json`
-- `Authorization`: `Api-Key <your_api_key>`
-
+- `Content-Type`: `multipart/form-data` **or** `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (JSON):
 
@@ -377,10 +401,22 @@ def process_voice_query_task(
 # ----------------------------------------------------------------
 class VoiceQuerySubmitView(APIView):
     """
+    https://app.lifehubinfiniti.ai/api/fini/voice-query/
+
+    
     🎙️ Submit Voice Query for LLM-Based Response
 
 This endpoint accepts audio file mp3(via multipart upload) , processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task. Returns a `task_id` for tracking.
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
 ---
 
 ### 🔐 Authentication:
@@ -392,12 +428,13 @@ This endpoint accepts audio file mp3(via multipart upload) , processes it using 
 ### 📥 Request Headers:
 - `Content-Type`: `multipart/form-data` **or** `application/json`
 - `Authorization`: `api key <your_key>`
-
+- `Orgin : https://app.xyz.ai/ `    
 ---
 
 ### 📦 Request Body Options:
 
 You must submit :
+- `body type `multipart/form-data`. 
 - `audio_file` (file) –mp3 preferred for `multipart/form-data`
 
 
@@ -445,7 +482,7 @@ Form-data:
         if not isinstance(audio_b64, str) or not audio_b64:
             return Response(
         {
-            "message": "Provide either 'audio_file' upload or 'audio_data' (base64) in the request.",
+            "message": "Provide either 'audio_file' upload in the request.",
             "code": status.HTTP_400_BAD_REQUEST
         },
         status=status.HTTP_400_BAD_REQUEST
@@ -485,16 +522,27 @@ It returns the current task state and, if completed, includes the transcribed te
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires **API Key**:
-  - Header: `Authorization: Api-Key <your_api_key>`
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `application/json`
-- `Authorization`: `Api-Key <your_api_key>`
-
+- `Content-Type`: `multipart/form-data` **or** `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
 
 ### 📦 Request Body:
@@ -537,6 +585,31 @@ class EdujobRecommendationAPIView(APIView):
     **Description:**  
     Accepts a natural language query and returns the most semantically similar chunks
     from your Edujobs corpus, ensuring distinctness by the `edujob_title` metadata field.
+    ---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
 
     **Request Body (application/json):**
     ```json

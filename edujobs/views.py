@@ -13,9 +13,30 @@ class ChatBotAPIView(APIView):
     """
     This endpoint takes a text prompt as input and returns a model-generated response. It supports optional parameters to control the model used and the randomness of the output (temperature). Primarily used for educational, conversational, or generative language tasks.
 
-### Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
+---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
 
 ### Request Body (JSON):
 - **prompt** (`str`, required):  
@@ -78,9 +99,30 @@ class EduJobChatAPIView(APIView):
     """
     This endpoint takes a text prompt as input and returns a model-generated response. It supports optional parameters to control the model used and the randomness of the output (temperature). Primarily used for educational, conversational, or generative language tasks.
 
-### Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
+---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
 
 ### Request Body (JSON):
 - **prompt** (`str`, required):  
@@ -143,9 +185,31 @@ class EduJobChatResultAPIView(APIView):
     This endpoint retrieves the status and final result of a previously submitted EduJob chat generation task.  
     It helps track the progress of asynchronous tasks submitted for edujob generation.
 
-### Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
+---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
 
 ### Request Body (JSON):
 - **task_id** (`str`, required):  

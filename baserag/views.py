@@ -88,18 +88,29 @@ This endpoint accepts a textual query and returns a high-dimensional vector (emb
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires authentication via:
-  - `Authorization: Api-Key <your_api_key>`
-  
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>` `
-
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (JSON):
 
@@ -143,18 +154,29 @@ This endpoint accepts a textual query and returns a high-dimensional vector (emb
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires authentication via:
-  - `Authorization: Api-Key <your_api_key>`
-  
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>` `
-
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (JSON):
 
@@ -235,17 +257,29 @@ This endpoint accepts a list of YouTube video URLs, retrieves their transcripts 
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires API key authentication only:
-  - `Authorization: Api-Key <your_api_key>`
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
-
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (JSON):
 
@@ -324,17 +358,29 @@ This endpoint accepts a `.pdf` or `.docx` document upload via `multipart/form-da
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires **Bearer Token**:
-  - Header: `Authorization: Bearer <api key>`
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `multipart/form-data`
-- `Authorization`: `Api key <asdasd****>`
-
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (form-data):
 
@@ -410,18 +456,29 @@ This endpoint allows you to track the status of a Celery task submitted for docu
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires authentication via either:
-  - **Authorization: Api-Key <your_api_key>**
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: One of:
-  - `Api-Key your_api_key`
-
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (JSON):
 
@@ -465,16 +522,29 @@ This endpoint allows clients to query the current status of an asynchronous Cele
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires API key authentication (`Authorization: Api-Key <your_api_key>`)
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
-
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
 ---
+
 
 ### 📦 Request Body (JSON):
 
@@ -533,11 +603,29 @@ This endpoint accepts a list of YouTube video URLs and asynchronously queues a b
 
 ---
 
-### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
 
 ### 📦 Request Body (JSON):
 
@@ -598,14 +686,28 @@ This endpoint allows clients to check the current status of a background Celery 
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires API key authentication (`Authorization: Api-Key <your_api_key>`)
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
 
 ---
 
@@ -665,17 +767,28 @@ This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, q
 
 ---
 
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
 ### 🔐 Authentication:
-- Requires API key authentication via:
-  - `Authorization: Api-Key <your_api_key>`
-  
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**:  
-  `Api-Key <your_api_key>` 
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
 
 ---
 

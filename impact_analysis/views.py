@@ -19,9 +19,31 @@ class ImpactAnalysisAPIView(APIView):
 ### Endpoint:
 **POST** `/api/impact_analysis/analyze/`
 
-### Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
+---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
 
 ### Request Body (JSON):
 - **instruction** (`str`, required):  
@@ -112,9 +134,31 @@ class ImpactAnalysisResultAPIView(APIView):
 ### Endpoint:
 **POST** `/api/impact_analysis/analyze/result/`
 
-### Request Headers:
-- **Content-Type**: `application/json`
-- **Authorization**: `Api-Key <your_api_key>`
+---
+
+**Prerequisites**  
+    - The organization must be registered in the system.  
+    - The client application must be registered with a valid redirect/Base URL.  
+    - There must be at least one active staff user on the organization.  
+
+    **Base URL**  
+    For example, if your org “xyz” is registered with the system, the base URL will be:
+    `https://app.xyz.ai/`,   
+    
+---
+
+### 🔐 Authentication:
+- Requires **api key <your_key>**:
+  - Header: `Authorization: api key <your_key>`
+
+---
+
+### 📥 Request Headers:
+- `Content-Type`: `application/json`
+- `Authorization`: `api key <your_key>`
+- `Orgin : https://app.xyz.ai/ `    
+---
+
 
 ### Request Body (JSON):
 - **task_id** (`str`, required):  
