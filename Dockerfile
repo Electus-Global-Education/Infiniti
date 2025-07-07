@@ -60,11 +60,6 @@ RUN mkdir -p /app/staticfiles /app/mediafiles && \
 # Switch to the non-root user
 USER appuser
 
-# Collect static files as the appuser
-# This assumes STATIC_ROOT is within /app (e.g., /app/staticfiles)
-# and appuser now has write permissions to it.
-RUN python manage.py collectstatic --noinput --clear
-
 # Expose the port Gunicorn will run on
 EXPOSE 8000
 
