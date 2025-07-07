@@ -63,10 +63,11 @@ USER appuser
 # Collect static files as the appuser
 # This assumes STATIC_ROOT is within /app (e.g., /app/staticfiles)
 # and appuser now has write permissions to it.
-# RUN python manage.py collectstatic --noinput --clear
+RUN python manage.py collectstatic --noinput --clear
 
 # Expose the port Gunicorn will run on
 EXPOSE 8000
 
-# Run the Django development server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Command to run the application using Gunicorn
+# Adjust --workers based on your server's CPU cores (typically 2-4 workers per core)
+CMD ["gunicorn", "--workers", "8", "--bind", "0.0.0.0:8000", "infiniti.wsgi:application"]
