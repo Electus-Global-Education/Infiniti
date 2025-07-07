@@ -46,8 +46,8 @@ ehthumbs.db
 # *.sqlite3 # If you use SQLite for local testing outside Docker
 
 # Environment files (these should be injected, not copied)
-.env
-.env.*
+#.env
+#.env.*
 !.env.example # Keep if you want the example in the image for some reason
 
 # Build artifacts
