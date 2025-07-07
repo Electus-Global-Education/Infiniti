@@ -43,9 +43,9 @@ AUTH_USER_MODEL = 'core.User'
 # --- 3. Production / HTTPS Proxy Settings ---
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
-    SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=True)
-    CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=True)
+    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
+    SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=False)
+    CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=False)
     SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
     if SECURE_HSTS_SECONDS > 0:
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
