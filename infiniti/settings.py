@@ -20,8 +20,12 @@ env = environ.Env(
     SECURE_SSL_REDIRECT=(bool, False),
     SESSION_COOKIE_SECURE=(bool, False),
     CSRF_COOKIE_SECURE=(bool, False),
-    SECURE_HSTS_SECONDS=(int, 0)
+    SECURE_HSTS_SECONDS=(int, 0),
+    REDIS_URL=(str, 'redis://redis:6379/0')
 )
+# Redis for chat memory
+REDIS_URL = env('REDIS_URL')
+# Read environment variables from .env files
 ENV_FILE_PATH = BASE_DIR / '.env.django'
 if os.path.exists(ENV_FILE_PATH):
     env.read_env(ENV_FILE_PATH)
@@ -50,6 +54,7 @@ if not DEBUG:
     if SECURE_HSTS_SECONDS > 0:
         SECURE_HSTS_INCLUDE_SUBDOMAINS = True
         SECURE_HSTS_PRELOAD = True
+
 
 # --- 4. Application Definition ---
 INSTALLED_APPS = [

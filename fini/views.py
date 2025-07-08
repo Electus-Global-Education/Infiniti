@@ -21,6 +21,20 @@ from baserag.utils import fetch_youtube_transcript, preprocess_text, process_vid
 from celery import shared_task
 from fini.edujob_rec import retrieve_distinct_edujob_chunks, retrieve_by_keywords
 from core.utils import generate_gemini_response, ALLOWED_MODELS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
+import redis
+import django
+import os
+import json
+
+
+# Initialize Django environment
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'infiniti.settings')
+django.setup()
+
+
+# Initialize Redis client for chat memory using the URL from settings
+# Ensure you have the REDIS_URL set in your settings.py or environment variables
+redis_client = redis.Redis.from_url(settings.REDIS_URL)
 
 # Default fallback values
 DEFAULT_ROLE = "Student"
@@ -33,9 +47,12 @@ DEFAULT_BASE_PROMPT = (
 
 class FiniLLMChatView(APIView):
     """
-    RAG-based LLM Chat API – generates contextual responses based on user queries, relevant document chunks, and role-based behavior.
+    RAG-based LLM Chat API – generates contextual responses based on user queries, relevant document chunks, and role-based behavior with per-session memory..
 
-This endpoint accepts a user query and optional parameters to guide how the query is handled and answered. The query is embedded, compared to a vector store of documents, and passed into a prompt for a Gemini-based LLM. Optionally, text-to-speech (TTS) can also be generated for the response.
+This endpoint accepts a user query and optional parameters to guide how the query is handled and answered. 
+The query is embedded, compared to a vector store of documents, and passed into a prompt for a Gemini-based LLM.
+Optionally, text-to-speech (TTS) can also be generated for the response and the conversation state is persisted per organization, per user, per session..
+
 
 ---
 
@@ -66,6 +83,24 @@ This endpoint accepts a user query and optional parameters to guide how the quer
 ### 📦 Request Body (JSON):
 
 #### Required:
+- `org_id` (`string`):  
+      Identifies the tenant organization. Used to namespace stored chat histories
+      so different orgs’ data never collide.  
+      **If missing**, the request will be rejected (400).
+
+- `user_uuid` (`string`):  
+      A unique identifier for the user. Used to track each user’s chat memory
+      within an organization.  
+      **If missing**, the request will be rejected (400).
+
+- `session_id` (`string`):  
+      A unique identifier for the user’s current chat session. All messages
+      within the same session_id are stored together.  
+      **If this changes** for the same `org_id` + `user_uuid`, the previous
+      session’s history is automatically deleted from Redis and a fresh memory
+      begins under the new session_id.
+       **If missing**, the request will be rejected (400).
+
 - `user_query` (`string`):  
   The natural language input/question provided by the user.
 
@@ -94,6 +129,9 @@ This endpoint accepts a user query and optional parameters to guide how the quer
 
 ```json
 {
+  "org_id": "org_abc123",
+  "user_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "session_id": "session_12345",
   "user_query": "Tell me about Lifehub and Infiniti in two lines.", | (required) from user input
   "user_id": "user_123" (optional),
   "user_role": "student" (optional) default: "learner",
@@ -108,6 +146,33 @@ This endpoint accepts a user query and optional parameters to guide how the quer
     def post(self, request):
         start = time.time() # Start timer for performance metrics
         data = request.data  # Get JSON payload from the request
+
+        # 1) Extract and validate identifiers
+        org_id      = data.get("org_id")
+        user_uuid  = data.get("user_uuid")
+        session_id = data.get("session_id")
+        if not org_id or not user_uuid or not session_id:
+            return Response(
+                {
+                    "message": "Parameters 'org_id', 'user_uuid' and 'session_id' are all required.",
+                    "code": status.HTTP_400_BAD_REQUEST
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # 2) If session rotated, delete old history
+        prev_session = redis_client.get(f"current_session:{org_id}:{user_uuid}")
+        if prev_session and prev_session.decode() != session_id:
+        # delete the chat history for the *old* session
+            redis_client.delete(f"chat_history:{org_id}:{user_uuid}:{prev_session.decode()}")
+        # update the current session pointer
+        redis_client.set(f"current_session:{org_id}:{user_uuid}", session_id)
+
+        # 3) Load existing chat history for this user+session
+        hist_start  = time.time()
+        hist_key = f"chat_history:{org_id}:{user_uuid}:{session_id}"
+        raw = redis_client.get(hist_key)
+        chat_history = json.loads(raw.decode()) if raw else []
+        history_load_sec = time.time() - hist_start
 
         #  Extract required field: user_query
         user_query = data.get("user_query", "").strip()
@@ -152,6 +217,14 @@ This endpoint accepts a user query and optional parameters to guide how the quer
 
             # Join the page content from retrieved chunks to build context
             context_text = "\n".join([doc.page_content for doc, _ in chunks]) if chunks else "No relevant context found."
+
+            # Build serialized memory string
+            # e.g. "User: hello\nAssistant: hi\nUser: myname waleed\nAssistant: nice to meet you"
+            mem_lines = []
+            for turn in chat_history:
+                mem_lines.append(f"User: {turn['user']}")
+                mem_lines.append(f"Assistant: {turn['bot']}")
+            memory_block = "\n".join(mem_lines) or "No prior conversation."
             # Inject clear instruction to LLM not to mention relevance even if context is not useful
             context_instruction = (
             "Use the context below if it is helpful. "
@@ -164,6 +237,8 @@ This endpoint accepts a user query and optional parameters to guide how the quer
 
             # Format the prompt with user and context details for the LLM
             prompt = (
+                f"Organization ID: {org_id}\n"
+                f"Conversation so far:\n{memory_block}\n\n"
                 f"User ID: {user_id}\n"
                 f"User Role: {user_role}\n"
                 f"Instructions: {base_prompt}\n\n"
@@ -184,6 +259,12 @@ This endpoint accepts a user query and optional parameters to guide how the quer
             text_reply = result.get("response", "[No response]")
             total_time = time.time() - start
 
+            # Append to Redis chat history
+            chat_history.append({
+                "user": cleaned_query,
+                "bot": text_reply
+                })
+            redis_client.set(hist_key, json.dumps(chat_history))
             #Build base response payload (text + meta)
             payload = {
                 "response": text_reply,
@@ -196,6 +277,7 @@ This endpoint accepts a user query and optional parameters to guide how the quer
                     "user_role": user_role,
                     "user_id": user_id,
                     "timing": {
+                        "history_load_sec": round(history_load_sec, 3),
                         "embedding_sec": round(embed_time, 3),
                         "retrieval_sec": round(chunk_time, 3),
                         "llm_generation_sec": round(llm_time, 3),
