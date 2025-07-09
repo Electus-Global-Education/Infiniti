@@ -16,6 +16,9 @@ from typing import List, Dict, Optional, Tuple
 from docx import Document as DocxDocument
 from PyPDF2 import PdfReader
 from baserag.connection import embedding_model, vector_store
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from google.api_core.exceptions import InvalidArgument
+import traceback
 
 SIMILARITY_THRESHOLD = 0.90
 # ------------------------------------------------
