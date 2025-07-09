@@ -481,19 +481,22 @@ def process_voice_query_task(
     chat_history.append({"user": cleaned_query, "bot": text_reply})
     redis_client.set(hist_key, json.dumps(chat_history))
 
+    audio_start = time.time()
     # 6) Optional TTS
     audio_out = None
     if want_audio:
         audio_out = generate_audio_response(text_reply)
+    
+    audio_time = time.time() - audio_start
 
     total_time = time.time() - start_total
 
     return {
         "transcript": cleaned_query,
         "response": text_reply,
-        "audio_b64": audio_out or "",
         "meta": {
             "timing": {
+                "audio_load_sec": round(audio_time, 3),
                 "history_load_sec": round(history_load_sec, 3),
                 "stt_sec": round(embed_start - start_total, 3),
                 "embedding_sec": round(embed_time, 3),
@@ -503,6 +506,7 @@ def process_voice_query_task(
             },
             "model": model_name,
             "temperature": temperature,
+            "audio_b64": audio_out or "",
         }
     }
 
@@ -645,6 +649,13 @@ Form-data:
         model_name = request.data.get("model_name", DEFAULT_MODEL)
         temperature = request.data.get("temperature", DEFAULT_TEMPERATURE)
         want_audio = bool(request.data.get("audio", False))
+
+        # FIX: parse `audio` flag properly
+        raw_audio = request.data.get("audio", False)
+        if isinstance(raw_audio, str):
+            want_audio = raw_audio.strip().lower() in ("true", "1", "yes")
+        else:
+            want_audio = bool(raw_audio)
 
         task = process_voice_query_task.delay(
             audio_b64, language, org_id,
