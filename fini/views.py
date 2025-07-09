@@ -597,10 +597,12 @@ Form-data:
 - user_uuid: 550e8400-e29b-41d4-a716-446655440000
 - session_id: session_12345
 - audio_file: voice_sample.mp3
+- audio: false
+- base_prompt: "You are a helpful assistant."
 - language: en-US
 - user_id: user_001
 - user_role: student
-- model_name: gemini-2.0-pro
+- model_name: gemini-2.5-flash
 - temperature: 0.3
     """
     permission_classes = [IsAuthenticated]
