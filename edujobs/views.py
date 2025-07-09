@@ -27,14 +27,14 @@ class ChatBotAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -45,7 +45,7 @@ class ChatBotAPIView(APIView):
 
 - **model_name** (`str`, optional, default: `gemini-2.5-flash`):  
   The name of the model to use. If not provided, the system will use the default model.  
-  *Example*: `"gemini-2.5-flash-preview-05-20"`
+  *Example*: `"gemini-2.5-flash"`
 
 - **temperature** (`float`, optional, `default: 0.5`):  
   Controls the randomness of the output. Values range from `0.0` (deterministic) to `1.0` (very random).  
@@ -113,8 +113,8 @@ class EduJobChatAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
@@ -131,7 +131,7 @@ class EduJobChatAPIView(APIView):
 
 - **model_name** (`str`, optional, default: `gemini-2.5-flash`):  
   The name of the model to use. If not provided, the system will use the default model.  
-  *Example*: `"gemini-2.5-flash-preview-05-20"`
+  *Example*: `"gemini-2.5-flash"`
 
 - **temperature** (`float`, optional, `default: 0.5`):  
   Controls the randomness of the output. Values range from `0.0` (deterministic) to `1.0` (very random).  
@@ -199,14 +199,14 @@ class EduJobChatResultAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 

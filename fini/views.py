@@ -68,14 +68,14 @@ Optionally, text-to-speech (TTS) can also be generated for the response and the 
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `multipart/form-data` **or** `application/json`
-- `Authorization`: `api key <your_key>`
+- `Content-Type`:  `application/json`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -328,14 +328,14 @@ If the task has completed successfully, it returns the generated audio in base64
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `multipart/form-data` **or** `application/json`
-- `Authorization`: `api key <your_key>`
+- `Content-Type`:  `application/json`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -406,6 +406,9 @@ def generate_tts_task(self, text: str) -> dict:
 def process_voice_query_task(
     audio_b64: str,
     language: str,
+    org_id: str,
+    user_uuid: str,
+    session_id: str,
     user_id: str,
     user_role: str,
     base_prompt: str,
@@ -421,6 +424,24 @@ def process_voice_query_task(
     Returns full payload dict.
     """
     start_total = time.time()
+
+    # --- Memory: rotate & load ---
+    prev_session = redis_client.get(f"current_session:{org_id}:{user_uuid}")
+    if prev_session and prev_session.decode() != session_id:
+        redis_client.delete(f"chat_history:{org_id}:{user_uuid}:{prev_session.decode()}")
+    redis_client.set(f"current_session:{org_id}:{user_uuid}", session_id)
+
+    hist_key    = f"chat_history:{org_id}:{user_uuid}:{session_id}"
+    hist_start  = time.time()
+    raw         = redis_client.get(hist_key)
+    chat_history = json.loads(raw.decode()) if raw else []
+    # build memory block
+    mem_lines = []
+    for turn in chat_history:
+        mem_lines.append(f"User: {turn['user']}")
+        mem_lines.append(f"Assistant: {turn['bot']}")
+    memory_block = "\n".join(mem_lines) or "No prior conversation."
+    history_load_sec = time.time() - hist_start
 
     # 1) Speech-to-Text
     transcript = transcribe_audio_response(audio_b64, language)
@@ -440,6 +461,8 @@ def process_voice_query_task(
 
     # 4) Compose prompt
     prompt = (
+        f"Organization ID: {org_id}\n"
+        f"Conversation so far:\n{memory_block}\n\n"
         f"User ID: {user_id}\n"
         f"User Role: {user_role}\n"
         f"Instructions: {base_prompt}\n\n"
@@ -454,6 +477,10 @@ def process_voice_query_task(
     text_reply = llm_resp.get("response", "[No response]")
     llm_time = time.time() - llm_start
 
+    # --- Persist updated memory ---
+    chat_history.append({"user": cleaned_query, "bot": text_reply})
+    redis_client.set(hist_key, json.dumps(chat_history))
+
     # 6) Optional TTS
     audio_out = None
     if want_audio:
@@ -467,6 +494,7 @@ def process_voice_query_task(
         "audio_b64": audio_out or "",
         "meta": {
             "timing": {
+                "history_load_sec": round(history_load_sec, 3),
                 "stt_sec": round(embed_start - start_total, 3),
                 "embedding_sec": round(embed_time, 3),
                 "retrieval_sec": round(chunk_time, 3),
@@ -488,7 +516,7 @@ class VoiceQuerySubmitView(APIView):
     
     🎙️ Submit Voice Query for LLM-Based Response
 
-This endpoint accepts audio file mp3(via multipart upload) , processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task. Returns a `task_id` for tracking.
+This endpoint accepts audio file mp3(via multipart upload) , processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task  and persists per-session chat memory in Redis. Returns a `task_id` for tracking.
 
 **Prerequisites**  
     - The organization must be registered in the system.  
@@ -502,19 +530,32 @@ This endpoint accepts audio file mp3(via multipart upload) , processes it using 
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `multipart/form-data` **or** `application/json`
-- `Authorization`: `api key <your_key>`
+- `Content-Type`: `multipart/form-data`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
 ### 📦 Request Body Options:
+#### Required Fields:
+- `org_id` (`string`):  
+      Tenant organization ID. Namespaces chat memory in Redis so different orgs do not collide.  
+      **If missing**, request is rejected (400).
 
+- `user_uuid` (`string`):  
+      Unique identifier for the user. Used to track per-user memory within an org.  
+      **If missing**, request is rejected (400).
+
+- `session_id` (`string`):  
+      Unique identifier for the chat session. All turns under the same `session_id` are
+      stored together. If the `session_id` changes for the same `org_id` + `user_uuid`,
+      the previous session’s history is automatically deleted and a new memory begins.
+      **If missing**, request is rejected (400).
 You must submit :
 - `body type `multipart/form-data`. 
 - `audio_file` (file) –mp3 preferred for `multipart/form-data`
@@ -533,6 +574,13 @@ You must submit :
 
 ---
 
+### 🧠 Memory Integration:
+    - Conversation turns are stored in Redis under the key:  
+      `chat_history:{org_id}:{user_uuid}:{session_id}`
+    - The active session pointer uses the key:  
+      `current_session:{org_id}:{user_uuid}`
+    - When `session_id` rotates, the old history key is automatically deleted.
+
 ### ✅ Example Request (multipart/form-data):
 
 ```http
@@ -541,6 +589,9 @@ Authorization: Api-Key <key>
 Content-Type: multipart/form-data
 
 Form-data:
+- org_id: org_abc123
+- user_uuid: 550e8400-e29b-41d4-a716-446655440000
+- session_id: session_12345
 - audio_file: voice_sample.mp3
 - language: en-US
 - user_id: user_001
@@ -552,6 +603,23 @@ Form-data:
     parser_classes = [MultiPartParser, JSONParser]
 
     def post(self, request):
+
+        # Validate identifiers
+        org_id     = request.data.get("org_id")
+        user_uuid  = request.data.get("user_uuid")
+        session_id = request.data.get("session_id")
+        if not org_id or not user_uuid or not session_id:
+            return Response(
+                {"message": "Fields 'org_id', 'user_uuid', and 'session_id' are required.",
+                 "code": status.HTTP_400_BAD_REQUEST},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 2) Rotate session: delete old history if session_id changed
+        prev_session = redis_client.get(f"current_session:{org_id}:{user_uuid}")
+        if prev_session and prev_session.decode() != session_id:
+            redis_client.delete(f"chat_history:{org_id}:{user_uuid}:{prev_session.decode()}")
+        redis_client.set(f"current_session:{org_id}:{user_uuid}", session_id)
         # Determine audio payload: file upload vs base64 field
         audio_b64 = None
         if 'audio_file' in request.FILES:
@@ -579,7 +647,8 @@ Form-data:
         want_audio = bool(request.data.get("audio", False))
 
         task = process_voice_query_task.delay(
-            audio_b64, language,
+            audio_b64, language, org_id,
+            user_uuid, session_id,
             user_id, user_role,
             base_prompt, model_name,
             temperature, want_audio
@@ -616,14 +685,14 @@ It returns the current task state and, if completed, includes the transcribed te
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
-- `Content-Type`: `multipart/form-data` **or** `application/json`
-- `Authorization`: `api key <your_key>`
+- `Content-Type`:  `application/json`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -681,14 +750,14 @@ class EdujobRecommendationAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 

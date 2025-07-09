@@ -235,14 +235,14 @@ class IngestGrantOpportunitiesAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -299,14 +299,14 @@ class RetrieveGrantChunksAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -391,14 +391,14 @@ class GrantRecommendationAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -530,14 +530,14 @@ class GenerateProposalAsyncAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -629,14 +629,14 @@ class ProposalStatusAPIView(APIView):
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 

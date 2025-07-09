@@ -100,14 +100,14 @@ This endpoint accepts a textual query and returns a high-dimensional vector (emb
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -166,14 +166,14 @@ This endpoint accepts a textual query and returns a high-dimensional vector (emb
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -269,14 +269,14 @@ This endpoint accepts a list of YouTube video URLs, retrieves their transcripts 
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -370,14 +370,14 @@ This endpoint accepts a `.pdf` or `.docx` document upload via `multipart/form-da
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -468,14 +468,14 @@ This endpoint allows you to track the status of a Celery task submitted for docu
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -534,14 +534,14 @@ This endpoint allows clients to query the current status of an asynchronous Cele
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -615,14 +615,14 @@ This endpoint accepts a list of YouTube video URLs and asynchronously queues a b
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -698,14 +698,14 @@ This endpoint allows clients to check the current status of a background Celery 
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
@@ -779,14 +779,14 @@ This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, q
 ---
 
 ### 🔐 Authentication:
-- Requires **api key <your_key>**:
-  - Header: `Authorization: api key <your_key>`
+- Requires **Api-Key <your_key>**:
+  - Header: `Authorization: Api-Key <your_key>`
 
 ---
 
 ### 📥 Request Headers:
 - `Content-Type`: `application/json`
-- `Authorization`: `api key <your_key>`
+- `Authorization`: `Api-Key <your_key>`
 - `Orgin : https://app.xyz.ai/ `    
 ---
 
