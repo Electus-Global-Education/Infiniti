@@ -763,7 +763,7 @@ class ProcessBoclipsChunksAPIView(APIView):
     """
     Enqueue background tasks to process Boclips videos by video ID.
 
-This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, queues a background Celery task to fetch the transcript (if any), chunk the content, and generate embeddings. It returns a map of input video IDs to their respective Celery task IDs.
+This endpoint accepts a list of Boclips video IDs (or URLs) and unique org_id issued on Infiniti system, and for each one, queues a background Celery task to fetch the transcript (if any), chunk the content, and generate embeddings. It returns a map of input video IDs to their respective Celery task IDs.
 
 ---
 
@@ -796,15 +796,17 @@ This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, q
 
 - **video_ids** (`list[str]`, required):  
   A list of Boclips video URLs or IDs to process.
+- **org_id** (`[str]`, required):  
+    The organization ID to associate with the Boclips data. This is used for tracking and access control.
 
 #### ✅ Example Request:
 
 ```json
 {
   "video_ids": [
-    "https://classroom.boclips.com/videos/shared/6080431a52688a3fcaf2ed26?referer=cf55155d-5f68-419c-97bd-c4298e8dea72&segmentEnd=60",
-    "https://classroom.boclips.com/videos/shared/6432cf562154dd5afd5f4854?referer=cf55155d-5f68-419c-97bd-c4298e8dea72&segmentEnd=275"
-  ]
+    "https://classroom.boclips.com/videos/shared/xyz"
+  ],
+  "org_id": "org_abc123"
 }
     """
 
@@ -815,6 +817,13 @@ This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, q
         if not isinstance(data, dict):
             return Response(
                 {"message": "Request body must be a JSON object with a key 'video_ids'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        org_id = data.get("org_id")
+        if not isinstance(org_id, str) or not org_id.strip():
+            return Response(
+                {"message": "`org_id` is required and must be a non-empty string.",
                  "code": status.HTTP_400_BAD_REQUEST},
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -829,7 +838,8 @@ This endpoint accepts a list of Boclips video IDs (or URLs), and for each one, q
 
         task_map = {}
         for vid in video_ids:
-            async_result = process_boclips_video_task.delay(vid)
+            org_id = data.get("org_id")
+            async_result = process_boclips_video_task.delay(vid,org_id)
             task_map[vid] = async_result.id
 
         return Response(
