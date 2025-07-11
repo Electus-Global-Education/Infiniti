@@ -631,6 +631,11 @@ This endpoint accepts a list of YouTube video URLs and asynchronously queues a b
 
 - **urls** (`list[str]`, required):  
   A list of valid YouTube video URLs to be processed.
+- **org_id** (`[str]`, required):  
+    The organization ID to associate with the Boclips data. This is used for tracking and access control.
+- **org_app_name** (`[str]`, required):
+    The name of the organization application that is making the request. This is used for logging and tracking purposes.and for islolating the data for every app.
+
 
 #### ✅ Example:
 
@@ -639,7 +644,9 @@ This endpoint accepts a list of YouTube video URLs and asynchronously queues a b
   "urls": [
     "https://youtu.be/aa528jbZDeI?si=fIONn5nt3xsKV45Q",
     "https://youtu.be/yadfklLi9tk?si=Pz7aPUxr2KLGf0nG"
-  ]
+  ],
+    "org_id": "org_abc123",
+    "org_app_name": "org app"
 }
     """
 
@@ -654,18 +661,38 @@ This endpoint accepts a list of YouTube video URLs and asynchronously queues a b
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # video_urls = data.get("urls")
+        # if not isinstance(video_urls, list):
+        #     return Response(
+        #         {"message": "`urls` must be a list of YouTube video URLs.",
+        #          "code": status.HTTP_400_BAD_REQUEST},
+        #         status=status.HTTP_400_BAD_REQUEST,
+            # )
+        org_id = data.get("org_id")
         video_urls = data.get("urls")
-        if not isinstance(video_urls, list):
+        org_app_name = data.get("org_app_name")
+
+        if (
+        not isinstance(org_id, str) or not org_id.strip() or
+        not isinstance(video_urls, list) or
+        not isinstance(org_app_name, str) or not org_app_name.strip()
+        ):
+            
             return Response(
-                {"message": "`urls` must be a list of YouTube video URLs.",
-                 "code": status.HTTP_400_BAD_REQUEST},
+            {
+                "message": "`org_id` and `org_app_name` are required and must be non-empty strings, "
+                       "and ``urls` must be a list of YouTube video URLs).",
+                "code": status.HTTP_400_BAD_REQUEST
+            },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         task_map = {}
         for url in video_urls:
             # Enqueue one Celery task per URL
-            async_result = process_video_chunks_task.delay(url)
+            org_id = data.get("org_id")
+            org_app_name = data.get("org_app_name")
+            async_result = process_video_chunks_task.delay(url, org_id, org_app_name)
             task_map[url] = async_result.id
 
         return Response(

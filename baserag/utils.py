@@ -484,7 +484,7 @@ def extract_text_from_pdf(path: str) -> str:
 
 
 @shared_task
-def process_video_chunks_task(video_url: str) -> Dict[str, object]:
+def process_video_chunks_task(video_url: str, org_id: str, org_app_name: str) -> Dict[str, object]:
 
     """
     Celery task to process a YouTube video into semantically meaningful text chunks
@@ -519,6 +519,8 @@ def process_video_chunks_task(video_url: str) -> Dict[str, object]:
     print(f"[DEBUG] Fetched video title: {title}")
 
     result: Dict[str, object] = {
+        "org_id": org_id,
+        "org_app_name": org_app_name,
         "video_url": video_url,
         "inserted_ids": [],
         "skipped": [],
@@ -598,6 +600,8 @@ def process_video_chunks_task(video_url: str) -> Dict[str, object]:
 
         metadata = {
             "title": title, 
+            "org_id": org_id,
+            "org_app_name": org_app_name,
             "edujob_title": title,
             "text": chunk_text,
             "chunk_text": chunk_text,
