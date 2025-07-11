@@ -625,7 +625,7 @@ def process_video_chunks_task(video_url: str) -> Dict[str, object]:
 #    And confirm in logs that `video_id` is not the full URL.
 # ──────────────────────────────────────────────────────────────────────────────
 @shared_task
-def process_boclips_video_task(video_ref: str,org_id: str) -> Dict[str, object]:
+def process_boclips_video_task(video_ref: str,org_id: str, org_app_name: str) -> Dict[str, object]:
     """
     1) Normalize to bare ID; set that to result['video_id'].
     2) Try to fetch metadata (title/description) if available.
@@ -639,6 +639,7 @@ def process_boclips_video_task(video_ref: str,org_id: str) -> Dict[str, object]:
     start_time = time.perf_counter()
     result: Dict[str, object] = {
         "org_id": org_id,
+        "org_app_name": org_app_name,
         "title": title,
         "video_id": None,
         "title": None,
@@ -731,6 +732,7 @@ def process_boclips_video_task(video_ref: str,org_id: str) -> Dict[str, object]:
         next_index += 1
         metadata_entry = {
             "org_id": org_id,
+            "org_app_name": org_app_name,
             "title": title,
             "edujob_title": title,
             "text": chunk_text,

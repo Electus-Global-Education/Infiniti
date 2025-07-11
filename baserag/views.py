@@ -763,7 +763,7 @@ class ProcessBoclipsChunksAPIView(APIView):
     """
     Enqueue background tasks to process Boclips videos by video ID.
 
-This endpoint accepts a list of Boclips video IDs (or URLs) and unique org_id issued on Infiniti system, and for each one, queues a background Celery task to fetch the transcript (if any), chunk the content, and generate embeddings. It returns a map of input video IDs to their respective Celery task IDs.
+This endpoint accepts a list of Boclips video IDs (or URLs) and unique org_id issued on Infiniti system and org_app_name , and for each one, queues a background Celery task to fetch the transcript (if any), chunk the content, and generate embeddings. It returns a map of input video IDs to their respective Celery task IDs.
 
 ---
 
@@ -798,6 +798,8 @@ This endpoint accepts a list of Boclips video IDs (or URLs) and unique org_id is
   A list of Boclips video URLs or IDs to process.
 - **org_id** (`[str]`, required):  
     The organization ID to associate with the Boclips data. This is used for tracking and access control.
+- **org_app_name** (`[str]`, required):
+    The name of the organization application that is making the request. This is used for logging and tracking purposes.and for islolating the data for every app.
 
 #### ✅ Example Request:
 
@@ -806,7 +808,8 @@ This endpoint accepts a list of Boclips video IDs (or URLs) and unique org_id is
   "video_ids": [
     "https://classroom.boclips.com/videos/shared/xyz"
   ],
-  "org_id": "org_abc123"
+  "org_id": "org_abc123",
+  "org_app_name": "org app"
 }
     """
 
@@ -821,25 +824,29 @@ This endpoint accepts a list of Boclips video IDs (or URLs) and unique org_id is
                 status=status.HTTP_400_BAD_REQUEST,
             )
         org_id = data.get("org_id")
-        if not isinstance(org_id, str) or not org_id.strip():
-            return Response(
-                {"message": "`org_id` is required and must be a non-empty string.",
-                 "code": status.HTTP_400_BAD_REQUEST},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         video_ids = data.get("video_ids")
-        if not isinstance(video_ids, list):
+        org_app_name = data.get("org_app_name")
+
+        if (
+        not isinstance(org_id, str) or not org_id.strip() or
+        not isinstance(video_ids, list) or
+        not isinstance(org_app_name, str) or not org_app_name.strip()
+        ):
+            
             return Response(
-                {"message": "`video_ids` must be a list of Boclips video IDs (strings).",
-                 "code": status.HTTP_400_BAD_REQUEST},
+            {
+                "message": "`org_id` and `org_app_name` are required and must be non-empty strings, "
+                       "and `video_ids` must be a list of Boclips video IDs (strings).",
+                "code": status.HTTP_400_BAD_REQUEST
+            },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         task_map = {}
         for vid in video_ids:
             org_id = data.get("org_id")
-            async_result = process_boclips_video_task.delay(vid,org_id)
+            org_app_name = data.get("org_app_name")
+            async_result = process_boclips_video_task.delay(vid,org_id,org_app_name)
             task_map[vid] = async_result.id
 
         return Response(
