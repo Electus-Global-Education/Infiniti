@@ -755,7 +755,7 @@ def process_boclips_video_task(video_ref: str,org_id: str, org_app_name: str) ->
     return result  
 
 @shared_task
-def process_document_task(file_path: str, original_filename: str) -> Dict[str, object]:
+def process_document_task(file_path: str, original_filename: str, org_id: str, org_app_name: str) -> Dict[str, object]:
     """
     1) Determine file type by extension (.docx or .pdf)
     2) Extract text accordingly
@@ -772,6 +772,8 @@ def process_document_task(file_path: str, original_filename: str) -> Dict[str, o
     start_time = time.perf_counter()
     result: Dict[str, object] = {
         "original_filename": original_filename,
+        "org_id": org_id,
+        "org_app_name": org_app_name,
         "total_chunks": 0,
         "inserted_ids": [],
         "skipped": [],
@@ -841,6 +843,8 @@ def process_document_task(file_path: str, original_filename: str) -> Dict[str, o
 
             metadata = {
                 "title": original_filename,
+                "org_id": org_id,
+                "org_app_name": org_app_name,
                 "edujob_title": original_filename,
                 "text": chunk_text,
                 "chunk_text": chunk_text,

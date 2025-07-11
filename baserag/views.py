@@ -386,6 +386,10 @@ This endpoint accepts a `.pdf` or `.docx` document upload via `multipart/form-da
 
 - `document` (**file**, required):  
   The `.pdf` or `.docx` file to upload and process. Only these two formats are supported.
+- **org_id** (`[str]`, required):  
+    The organization ID to associate with the Boclips data. This is used for tracking and access control.
+- **org_app_name** (`[str]`, required):
+    The name of the organization application that is making the request. This is used for logging and tracking purposes.and for islolating the data for every app.
 
 ---
 
@@ -402,6 +406,29 @@ curl -X POST http://localhost:8000/api/fini/upload-document/ \
             return Response(
                 {"message": "No file provided under 'document'.",
                  "code": status.HTTP_400_BAD_REQUEST},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = request.data
+        if not isinstance(data, dict):
+            return Response(
+                {"message": "Request body must be a JSON object with a key 'urls'.",
+                 "code": status.HTTP_400_BAD_REQUEST},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        org_id = data.get("org_id")
+        org_app_name = data.get("org_app_name")
+
+        if (
+        not isinstance(org_id, str) or not org_id.strip() or
+        not isinstance(org_app_name, str) or not org_app_name.strip()
+        ):
+            
+            return Response(
+            {
+                "message": "`org_id` and `org_app_name` are required and must be non-empty strings, ",
+                "code": status.HTTP_400_BAD_REQUEST
+            },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -432,7 +459,7 @@ curl -X POST http://localhost:8000/api/fini/upload-document/ \
             )
 
         # 4) Enqueue the Celery task, passing both file_path and original filename
-        task = process_document_task.delay(save_path, filename)
+        task = process_document_task.delay(save_path, filename,org_id, org_app_name)
 
         return Response(
             {
