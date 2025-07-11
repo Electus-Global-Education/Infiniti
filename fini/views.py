@@ -3,6 +3,7 @@
 import os
 import time
 import traceback
+import subprocess
 import base64
 from typing import Dict, Any
 from uuid import uuid4
@@ -23,8 +24,11 @@ from fini.edujob_rec import retrieve_distinct_edujob_chunks, retrieve_by_keyword
 from core.utils import generate_gemini_response, ALLOWED_MODELS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
 import redis
 import django
-import os
 import json
+import traceback
+from typing import Any, Dict
+from google.cloud import speech
+
 
 
 # Initialize Django environment
@@ -398,13 +402,30 @@ def generate_tts_task(self, text: str) -> dict:
         # Otherwise, just bubble up the exception so the client sees FAILURE:
         print(f"[generate_tts_task] ERROR: {e}")
         raise Exception(f"TTS task failed: {e}\n{traceback.format_exc()}")
+    
+def transcribe_audio_file(file_path: str, language: str) -> str:
+    """
+    Transcribe an MP3 file using Google Cloud Speech-to-Text.
+    """
+    client = speech.SpeechClient()
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    audio = speech.RecognitionAudio(content=content)
+    config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.MP3,
+        language_code=language,
+    )
+    response = client.recognize(config=config, audio=audio)
+    transcripts = [res.alternatives[0].transcript for res in response.results]
+    return " ".join(transcripts)
+
 
 # ----------------------------------------------------------------
 # Celery Task: Full Voice-Query Pipeline
 # ----------------------------------------------------------------
 @shared_task(name="fini.tasks.process_voice_query_task")
 def process_voice_query_task(
-    audio_b64: str,
+    file_rel_path: str,
     language: str,
     org_id: str,
     user_uuid: str,
@@ -424,6 +445,8 @@ def process_voice_query_task(
     Returns full payload dict.
     """
     start_total = time.time()
+    # Full path to the MP3 file
+    mp3_path = os.path.join(settings.MEDIA_ROOT, file_rel_path)
 
     # --- Memory: rotate & load ---
     prev_session = redis_client.get(f"current_session:{org_id}:{user_uuid}")
@@ -444,7 +467,16 @@ def process_voice_query_task(
     history_load_sec = time.time() - hist_start
 
     # 1) Speech-to-Text
-    transcript = transcribe_audio_response(audio_b64, language)
+    try:
+        transcript = transcribe_audio_file(mp3_path, language)
+    except Exception as e:
+        transcript = ""
+    finally:
+        # Remove the temp MP3 file after transcription
+        if os.path.exists(mp3_path):
+            os.remove(mp3_path)
+        # pass
+
     cleaned_query = transcript.strip()
 
     # 2) Embedding
@@ -520,7 +552,7 @@ class VoiceQuerySubmitView(APIView):
     
     🎙️ Submit Voice Query for LLM-Based Response
 
-This endpoint accepts audio file mp3(via multipart upload) , processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task  and persists per-session chat memory in Redis. Returns a `task_id` for tracking.
+This endpoint accepts  **Wav or MP3** audio file (via multipart upload) , processes it using a speech-to-text engine, and submits the transcribed query to a background LLM task  and persists per-session chat memory in Redis. Returns a `task_id` for tracking.
 
 **Prerequisites**  
     - The organization must be registered in the system.  
@@ -562,7 +594,7 @@ This endpoint accepts audio file mp3(via multipart upload) , processes it using 
       **If missing**, request is rejected (400).
 You must submit :
 - `body type `multipart/form-data`. 
-- `audio_file` (file) –mp3 preferred for `multipart/form-data`
+- `audio_file` (file) Wav or Mp3  for `multipart/form-data`
 
 
 #### Additional Parameters:
@@ -626,23 +658,43 @@ Form-data:
         if prev_session and prev_session.decode() != session_id:
             redis_client.delete(f"chat_history:{org_id}:{user_uuid}:{prev_session.decode()}")
         redis_client.set(f"current_session:{org_id}:{user_uuid}", session_id)
-        # Determine audio payload: file upload vs base64 field
-        audio_b64 = None
-        if 'audio_file' in request.FILES:
-            audio_file = request.FILES['audio_file']
-            audio_bytes = audio_file.read()
-            audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-        else:
-            audio_b64 = request.data.get("audio_data")
-
-        if not isinstance(audio_b64, str) or not audio_b64:
+        # Retrieve uploaded WebA file
+        audio_file = request.FILES.get('audio_file')
+        if not audio_file:
             return Response(
-        {
-            "message": "Provide either 'audio_file' upload in the request.",
-            "code": status.HTTP_400_BAD_REQUEST
-        },
-        status=status.HTTP_400_BAD_REQUEST
+                {"message": "Provide 'audio_file' in WebA format.", "code": 400},
+                status=400
             )
+
+        # Save WebA file to media storage
+        dir_path = 'voice_queries'
+        weba_name = f"{org_id}_{user_uuid}_{session_id}.weba"
+        weba_path = os.path.join(dir_path, weba_name)
+        default_storage.save(weba_path, audio_file)
+        weba_full = default_storage.path(weba_path)
+
+        # Prepare MP3 paths
+        mp3_name = f"{org_id}_{user_uuid}_{session_id}.mp3"
+        mp3_rel  = os.path.join(dir_path, mp3_name)
+        mp3_full = os.path.join(settings.MEDIA_ROOT, mp3_rel)
+
+        # Convert WebA to MP3 via ffmpeg
+        try:
+            subprocess.run(
+                ["ffmpeg", "-i", weba_full, "-y", mp3_full],
+                check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+        except subprocess.CalledProcessError as e:
+            # Cleanup and error
+            default_storage.delete(weba_path)
+            return Response(
+                {"message": "Audio conversion failed.", "details": e.stderr.decode()},
+                status=500
+            )
+        finally:
+            # Remove original WebA file
+            default_storage.delete(weba_path)
+
 
         language = request.data.get("language", "en-US")
         user_id = request.data.get("user_id", DEFAULT_USER_ID)
@@ -660,7 +712,7 @@ Form-data:
             want_audio = bool(raw_audio)
 
         task = process_voice_query_task.delay(
-            audio_b64, language, org_id,
+            mp3_rel, language, org_id,
             user_uuid, session_id,
             user_id, user_role,
             base_prompt, model_name,

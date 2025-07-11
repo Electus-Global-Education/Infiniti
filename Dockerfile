@@ -23,6 +23,7 @@ RUN apt-get update \
        zlib1g-dev \
        gettext \
        postgresql-client \
+       ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
